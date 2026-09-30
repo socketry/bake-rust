@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 //! Compile ordinary Rust functions into explicit Bake task descriptors.
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};

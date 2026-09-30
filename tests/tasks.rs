@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 use bake::{Context, Error, Parameter, Registry, Result, Task, Value};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};

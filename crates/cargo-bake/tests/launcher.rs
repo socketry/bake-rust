@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};

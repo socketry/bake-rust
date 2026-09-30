@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 use crate::Result;
 use std::ffi::OsString;
 use std::path::PathBuf;

@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 use crate::{Arguments, Context, Parameter, Result, Value};
 
 /// A function's command metadata and generated invocation adapter.

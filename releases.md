@@ -1,6 +1,6 @@
 # Releases
 
-## Unreleased
+## v0.2.1
 
 - Add optional namespaced task hooks for composing project-specific automation.
 

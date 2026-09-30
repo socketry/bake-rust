@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 use crate::{Arguments, Context, Error, Format, Result, Task, output};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Write};

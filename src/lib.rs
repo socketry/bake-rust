@@ -1,9 +1,11 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 //! Composable development tasks with typed arguments and shared context.
 //!
 //! Task attributes generate a sibling `function_task()` descriptor while
 //! preserving the original function for ordinary Rust calls. Register those
 //! descriptors explicitly and call [`Registry::run`] from your task binary.
-
 extern crate self as bake;
 
 mod arguments;

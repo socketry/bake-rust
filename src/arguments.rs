@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 use crate::{Error, Result};
 use std::collections::BTreeMap;
 use std::fmt::Display;

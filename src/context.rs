@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 use crate::output::Format;
 use crate::registry::Invocation;
 use crate::{Error, Registry, Result, Value};

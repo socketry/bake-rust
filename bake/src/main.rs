@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 use bake::{Context, Error, Registry, Result, Value};
 // Pull the dependency into the executable so its task descriptors are linked.
 use bake_cargo as _;
