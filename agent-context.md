@@ -19,8 +19,14 @@ dependencies must be referenced by the executable to make the linker include the
 - src/context.rs: shared state, project root, previous result, nested calls.
 - crates/macros/: task attribute and generated adapters; re-exported by bake.
 - crates/cargo-bake/: Cargo discovery and process launcher; independent of the core.
-- crates/releases/: release-document parsing and reusable notes/update tasks.
+- [bake-releases-rust](https://github.com/socketry/bake-releases-rust):
+  release-document parsing and reusable notes/update/GitHub release tasks.
+- [bake-releases-cargo-rust](https://github.com/socketry/bake-releases-cargo-rust):
+  workspace publishing, GitHub rulesets/environments, and crates.io trusted-publishing tasks.
 - bake/: this repository's task binary and examples of composition.
+
+The task binary loads the two release-task libraries from sibling checkouts.
+The CI workflows clone those repositories beside this workspace before building it.
 
 ## Important boundaries
 

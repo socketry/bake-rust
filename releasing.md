@@ -1,34 +1,31 @@
 # Releasing
 
-The workspace starts at version 0.1.0. Packages share a version, but are published
-individually. Creating a GitHub repository or pushing main does not publish a crate.
+The workspace starts at version 0.1.0. All publishable packages share one version
+and one release tag. Creating a GitHub repository or pushing main does not publish crates.
 
 ## Preparation
 
-1. Update workspace.package.version and the versions of local package dependencies.
-2. Run cargo test --workspace --locked and the formatting/Clippy checks.
-3. Rename the Unreleased heading with cargo bake releases:update vVERSION. Review
+1. Run `cargo bake releases:version:patch`, `minor`, `major`, or
+   `bump --version VERSION` to update the workspace packages together.
+2. Run the workspace tests and the formatting/Clippy checks.
+3. Rename the Unreleased heading with `cargo bake releases:update vVERSION`. Review
    the notes with cargo bake releases:notes vVERSION. Add a fresh Unreleased section
    for subsequent development.
 4. Commit the reviewed release changes.
 
-The release tasks currently manage notes only; manifest version changes remain
-explicit edits.
+The version tasks update Cargo manifests and local path dependency requirements.
+They do not update the release notes or commit the changes.
 
 ## First publication
 
-From a machine authenticated with crates.io, publish the packages in this order:
+From a machine authenticated with crates.io, publish the workspace:
 
 ```sh
-cargo publish --package socketry-bake-macros --locked
-cargo publish --package socketry-bake --locked
-cargo publish --package socketry-bake-releases --locked
-cargo publish --package socketry-cargo-bake --locked
+cargo publish --workspace --locked
 ```
 
-Wait for each dependency to become available before publishing its consumers.
-The launcher has no dependency on the other Bake packages and can be published
-independently. The bake-rust-tasks package is unpublished.
+Cargo selects the publishable workspace packages and skips the unpublished
+`bake-rust-tasks` package.
 
 Package names are candidates until the registry accepts them; this repository
 does not reserve names by itself. Review the package contents with cargo package
@@ -48,17 +45,29 @@ the Rust project's [crates.io authentication action](https://github.com/rust-lan
 to obtain a short-lived publishing token. Repository creation does not configure
 the registry's trusted publishers automatically.
 
-Push a tag of the form PACKAGE-vVERSION to publish that package:
+The release-task libraries are maintained in their own repositories and have
+independent versions and `releases.md` files. See the
+[Bake Releases](https://github.com/socketry/bake-releases-rust) and
+[Bake Cargo Releases](https://github.com/socketry/bake-releases-cargo-rust)
+repositories for their release instructions.
+
+For later releases, commit the reviewed version and release-note changes, then run:
 
 ```sh
-git tag socketry-bake-macros-v0.1.0
-git push origin socketry-bake-macros-v0.1.0
+cargo bake releases:cargo:release
 ```
 
-The workflow checks that the tag matches the selected manifest version, runs the
-workspace tests, and publishes the package. Publish dependency tags first and wait
-for success before tagging dependents. Do not push a publication tag for a version
-that is already published; crates.io versions are immutable.
+The task packages the workspace, creates and pushes a `vVERSION` tag, and the
+GitHub workflow publishes every publishable package from that commit. The
+workflow verifies that all those packages have the tagged version. Do not reuse
+a tag or crates.io version; both are immutable release identifiers.
 
-The workflow does not create a GitHub Release automatically. Release notes can be
-extracted for one using cargo bake releases:notes vVERSION.
+The workflow does not create a GitHub Release automatically. After the tag has
+published the crates, create a GitHub Release from the matching notes with:
+
+```sh
+cargo bake releases:github:release vVERSION
+```
+
+The final command uses the GitHub CLI and publishes the release immediately. Add
+`--draft true` to create a draft for review first.

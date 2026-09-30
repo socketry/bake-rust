@@ -32,6 +32,10 @@
 - Validate a command chain before executing it. Stop execution on failure.
 - Keep package versions in workspace.package and use path plus version dependencies
   for publishable workspace packages.
+- Use one repository per independently released package or group. A multi-package
+  workspace shares one version and one releases.md; keep independently versioned
+  packages in separate repositories and use sibling path dependencies for local
+  cross-repository development.
 
 ## Documentation and verification
 
