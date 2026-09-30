@@ -14,8 +14,8 @@ find its workspace. The default task manifest is workspace-root/bake/Cargo.toml.
 Configure workspace.metadata.bake.manifest, or package.metadata.bake.manifest for
 a package-specific override. An override path is relative to the corresponding root.
 
-Use --manifest-path to select a project, --offline to disable Cargo network access,
---locked to require unchanged lockfiles, and --release to use the release profile.
+Use --manifest-path PATH to select a project, --offline to disable Cargo network
+access, --locked to require unchanged lockfiles, and --release to use the release profile.
 Place launcher flags before task arguments. --list and TASK --help are handled by
 the compiled task binary; --help explains the launcher without compiling it.
 

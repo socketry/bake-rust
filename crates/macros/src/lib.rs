@@ -19,6 +19,7 @@ struct ParameterOptions {
     default: Option<Expr>,
     named: bool,
     context: bool,
+    input: bool,
     help: Option<LitStr>,
 }
 
@@ -40,10 +41,12 @@ fn options(attributes: &mut Vec<Attribute>) -> syn::Result<ParameterOptions> {
                 options.named = true;
             } else if meta.path.is_ident("context") {
                 options.context = true;
+            } else if meta.path.is_ident("input") {
+                options.input = true;
             } else if meta.path.is_ident("help") {
                 options.help = Some(meta.value()?.parse()?);
             } else {
-                return Err(meta.error("expected default, named, context, or help"));
+                return Err(meta.error("expected default, named, context, input, or help"));
             }
             Ok(())
         })?;
@@ -76,14 +79,25 @@ fn expand(
 ) -> syn::Result<proc_macro2::TokenStream> {
     use syn::parse::Parser;
     let mut name = None::<LitStr>;
+    let mut handles_output = false;
+    let mut output_option_seen = false;
+    let mut builtin = false;
     let mut runtime: Path = syn::parse_quote!(::bake);
     let parser = syn::meta::parser(|meta| {
         if meta.path.is_ident("name") {
             name = Some(meta.value()?.parse()?);
         } else if meta.path.is_ident("runtime") {
             runtime = meta.value()?.parse()?;
+        } else if meta.path.is_ident("output") {
+            if output_option_seen {
+                return Err(meta.error("duplicate output option"));
+            }
+            output_option_seen = true;
+            handles_output = true;
+        } else if meta.path.is_ident("builtin") {
+            builtin = true;
         } else {
-            return Err(meta.error("expected name or runtime"));
+            return Err(meta.error("expected name, runtime, output, or builtin"));
         }
         Ok(())
     });
@@ -102,6 +116,13 @@ fn expand(
     }
     let function_name = &function.sig.ident;
     let descriptor_name = format_ident!("{}_task", function_name);
+    let registration_name = format_ident!(
+        "__BAKE_REGISTER_{}",
+        function_name
+            .to_string()
+            .trim_start_matches("r#")
+            .to_uppercase()
+    );
     let command_name = name.unwrap_or_else(|| {
         LitStr::new(
             function_name.to_string().trim_start_matches("r#"),
@@ -136,6 +157,7 @@ fn expand(
     let invocation_arguments =
         format_ident!("__bake_arguments", span = proc_macro2::Span::mixed_site());
     let mut has_context = false;
+    let mut has_input = false;
     for input in &mut function.sig.inputs {
         let FnArg::Typed(argument) = input else {
             return Err(syn::Error::new_spanned(
@@ -159,6 +181,31 @@ fn expand(
         let parameter_name = identifier.to_string().trim_start_matches("r#").to_owned();
         let settings = options(&mut argument.attrs)?;
         let parameter_type = argument.ty.as_ref();
+        if settings.input {
+            let is_value = matches!(parameter_type, Type::Path(path)
+                if path.path.segments.last().is_some_and(|segment| {
+                    segment.ident == "Value" && matches!(segment.arguments, syn::PathArguments::None)
+                })
+            );
+            if !is_value
+                || has_input
+                || settings.default.is_some()
+                || settings.named
+                || settings.context
+                || settings.help.is_some()
+            {
+                return Err(syn::Error::new_spanned(
+                    argument,
+                    "use one #[bake(input)] owned bake::Value parameter without other options",
+                ));
+            }
+            has_input = true;
+            bindings.push(
+                quote!(let #identifier: #parameter_type = #invocation_context.previous().clone();),
+            );
+            call_arguments.push(quote!(#identifier));
+            continue;
+        }
         let is_context = settings.context
             || (parameter_name == "context" && matches!(parameter_type, Type::Reference(_)));
         if is_context {
@@ -166,6 +213,7 @@ fn expand(
                 || settings.default.is_some()
                 || settings.named
                 || settings.help.is_some()
+                || settings.input
             {
                 return Err(syn::Error::new_spanned(
                     argument,
@@ -224,18 +272,38 @@ fn expand(
         bindings.push(quote!(let #identifier: #parameter_type = #binding;));
         call_arguments.push(quote!(#identifier));
     }
+    let task = quote! {
+            #runtime::Task::new(#command_name, #documentation, vec![#(#parameters),*], |#invocation_context, #invocation_arguments| {
+                #(#bindings)*
+                let output = #function_name(#(#call_arguments),*).map_err(|error| #runtime::Error::new(error.to_string()))?;
+                #runtime::value(output)
+            })
+    };
+    let task = if handles_output {
+        quote!(#task.handles_output())
+    } else {
+        task
+    };
+    let builtin = syn::LitBool::new(builtin, proc_macro2::Span::call_site());
     Ok(quote! {
         #function
 
         #(#conditional_attributes)*
         #[doc = "Generated Bake task descriptor."]
         #visibility fn #descriptor_name() -> #runtime::Task {
-            #runtime::Task::new(#command_name, #documentation, vec![#(#parameters),*], |#invocation_context, #invocation_arguments| {
-                #(#bindings)*
-                let output = #function_name(#(#call_arguments),*).map_err(|error| #runtime::Error::new(error.to_string()))?;
-                #runtime::value(output)
-            })
+            #task
         }
+
+        #(#conditional_attributes)*
+        #[doc(hidden)]
+        #[#runtime::__private::linkme::distributed_slice(#runtime::__private::TASK_REGISTRATIONS)]
+        #[linkme(crate = #runtime::__private::linkme)]
+        static #registration_name: #runtime::__private::TaskRegistration =
+            #runtime::__private::TaskRegistration {
+                factory: #descriptor_name,
+                module_path: module_path!(),
+                builtin: #builtin,
+            };
     })
 }
 

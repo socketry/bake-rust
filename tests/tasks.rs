@@ -78,6 +78,17 @@ fn r#type(__bake_arguments: String, __bake_context: String) -> Result<String> {
     Ok(format!("{__bake_arguments}:{__bake_context}"))
 }
 
+#[bake::task]
+fn values() -> Result<Vec<usize>> {
+    Ok(vec![3, 5, 8])
+}
+
+#[bake::task(name = "output", output)]
+fn custom_output(context: &mut Context, #[bake(input)] input: Value) -> Result<Value> {
+    context.write_output(&format!("handled: {input}\n"));
+    Ok(input)
+}
+
 fn registry() -> Registry {
     let mut registry = Registry::new();
     for task in [
@@ -93,6 +104,7 @@ fn registry() -> Registry {
         fail_task(),
         effect_task(),
         type_task(),
+        values_task(),
     ] {
         registry.register(task).unwrap();
     }
@@ -113,19 +125,18 @@ fn run(arguments: &[&str]) -> Result<String> {
 fn positional_arguments_and_typed_defaults() {
     assert_eq!(run(&["greet", "Samuel"]).unwrap(), "Samuel.\n");
     assert_eq!(
-        run(&["greet", "Samuel", "repeat=2", "--excited"]).unwrap(),
+        run(&["greet", "Samuel", "--repeat", "2", "--excited", "true"]).unwrap(),
         "Samuel!Samuel!\n"
     );
     assert_eq!(greet("Sam".into(), false, 1).unwrap(), "Sam.");
 }
 
 #[test]
-fn named_argument_spellings_and_boolean_values() {
+fn named_arguments_use_two_tokens_and_boolean_values_are_explicit() {
     for arguments in [
-        vec!["greet", "Sam", "excited=true"],
-        vec!["greet", "--name=Sam", "--excited=true"],
+        vec!["greet", "Sam", "--excited", "true"],
         vec!["greet", "--excited", "true", "Sam"],
-        vec!["greet", "name=Sam", "--excited"],
+        vec!["greet", "--name", "Sam", "--excited", "true"],
     ] {
         assert_eq!(run(&arguments).unwrap(), "Sam!\n");
     }
@@ -133,7 +144,9 @@ fn named_argument_spellings_and_boolean_values() {
         run(&["greet", "Sam", "--excited", "false"]).unwrap(),
         "Sam.\n"
     );
-    assert_eq!(run(&["greet", "Sam", "--excited=false"]).unwrap(), "Sam.\n");
+    assert!(run(&["greet", "Sam", "--excited"]).is_err());
+    assert!(run(&["greet", "Sam", "excited=true"]).is_err());
+    assert!(run(&["greet", "Sam", "--excited=true"]).is_err());
 }
 
 #[test]
@@ -146,8 +159,10 @@ fn optional_and_repeated_values_and_hyphenated_names() {
         "options",
         "--output",
         "some file",
-        "labels=one",
-        "--labels=two",
+        "--labels",
+        "one",
+        "--labels",
+        "two",
         "--release-path",
         "changes.md",
     ])
@@ -165,14 +180,21 @@ fn negative_numbers_and_literal_positional_arguments() {
         run(&["greet", "--", "--name=value"]).unwrap(),
         "--name=value.\n"
     );
-    assert_eq!(run(&["greet", "--name=--flag"]).unwrap(), "--flag.\n");
+    assert_eq!(
+        run(&["greet", "--", "name=value"]).unwrap(),
+        "name=value.\n"
+    );
 }
 
 #[test]
 fn argument_errors_are_actionable() {
     for (arguments, message) in [
         (vec!["greet"], "missing argument"),
-        (vec!["greet", "Sam", "repeat=many"], "invalid usize"),
+        (vec!["greet", "Sam", "--repeat", "many"], "invalid usize"),
+        (
+            vec!["greet", "Sam", "--repeat=many"],
+            "separate `--name value` tokens",
+        ),
         (vec!["greet", "Sam", "--unknown"], "unknown argument"),
         (vec!["greet", "Sam", "--name", "Again"], "more than once"),
         (vec!["greet", "Sam", "--repeat"], "requires a value"),
@@ -200,7 +222,7 @@ fn required_named_arguments() {
 #[test]
 fn chain_validation_precedes_all_effects() {
     CALLS.store(0, Ordering::SeqCst);
-    assert!(run(&["effect", "::", "greet", "Sam", "repeat=invalid"]).is_err());
+    assert!(run(&["effect", "::", "greet", "Sam", "--repeat", "invalid"]).is_err());
     assert!(run(&["effect", "::", "missing"]).is_err());
     assert_eq!(CALLS.load(Ordering::SeqCst), 0);
 }
@@ -210,7 +232,7 @@ fn implicit_and_explicit_chains_pass_previous_results() {
     assert_eq!(run(&["add", "2", "3", "previous"]).unwrap(), "5\n");
     assert_eq!(run(&["add", "2", "3", "::", "previous"]).unwrap(), "5\n");
     assert_eq!(
-        run(&["greet", "Sam", "--excited", "previous"]).unwrap(),
+        run(&["greet", "Sam", "--excited", "true", "previous"]).unwrap(),
         "Sam!\n"
     );
 }
@@ -262,9 +284,95 @@ fn json_and_silent_unit_output() {
 }
 
 #[test]
+fn default_output_task_formats_raw_json_and_ndjson() {
+    assert_eq!(run(&["greet", "Sam"]).unwrap(), "Sam.\n");
+    assert_eq!(run(&["--json", "greet", "Sam"]).unwrap(), "\"Sam.\"\n");
+    assert_eq!(
+        run(&["values", "output", "--format", "json"]).unwrap(),
+        "[\n  3,\n  5,\n  8\n]\n"
+    );
+    assert_eq!(
+        run(&["values", "output", "--format", "ndjson"]).unwrap(),
+        "3\n5\n8\n"
+    );
+    assert!(run(&["greet", "Sam", "output", "--format", "unknown"]).is_err());
+    assert!(run(&["greet", "Sam", "output", "--format", "ndjson"]).is_err());
+}
+
+#[test]
+fn explicit_output_consumes_previous_value_and_returns_it() {
+    let mut context = registry().context(".");
+    assert_eq!(context.call("greet", &["Sam"]).unwrap(), "Sam.");
+    assert_eq!(
+        context.call("output", &["--format", "json"]).unwrap(),
+        "Sam."
+    );
+    assert_eq!(*context.previous(), "Sam.");
+    assert_eq!(context.call("null", &[]).unwrap(), "Sam.");
+}
+
+#[test]
+fn output_task_writes_files_with_inferred_or_explicit_formats() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut context = registry().context(directory.path());
+    context.call("values", &[]).unwrap();
+    context.call("output", &["--file", "values.json"]).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(directory.path().join("values.json")).unwrap(),
+        "[\n  3,\n  5,\n  8\n]\n"
+    );
+    context
+        .call("output", &["--file", "values.txt", "--format", "ndjson"])
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(directory.path().join("values.txt")).unwrap(),
+        "3\n5\n8\n"
+    );
+    assert!(
+        context
+            .call("output", &["--file", "missing/values.txt"])
+            .unwrap_err()
+            .to_string()
+            .contains("missing/values.txt")
+    );
+}
+
+#[test]
+fn null_task_suppresses_default_output() {
+    assert_eq!(run(&["greet", "Sam", "::", "null"]).unwrap(), "");
+    assert_eq!(run(&["values", "::", "null"]).unwrap(), "");
+    assert!(run(&["--list"]).unwrap().contains("output"));
+    assert!(run(&["output", "--help"]).unwrap().contains("format"));
+}
+
+#[test]
+fn projects_can_replace_default_output_explicitly() {
+    let mut registry = registry();
+    assert!(registry.register(custom_output_task()).is_err());
+    registry.replace("output", custom_output_task()).unwrap();
+    assert_eq!(
+        run_with_registry(registry, &["greet", "Sam"]),
+        "handled: \"Sam.\"\n"
+    );
+}
+
+fn run_with_registry(registry: Registry, arguments: &[&str]) -> String {
+    registry
+        .run_arguments(
+            ".",
+            &arguments
+                .iter()
+                .map(|argument| (*argument).to_owned())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+}
+
+#[test]
 fn help_contains_parameters_and_is_sorted() {
     let help = run(&["greet", "--help"]).unwrap();
-    assert!(help.contains("repeat: usize"));
+    assert!(help.contains("--repeat value: usize"));
+    assert!(help.contains("--excited value: bool"));
     assert!(help.contains("default: 1"));
     assert!(
         run(&["required", "--help"])
@@ -291,6 +399,11 @@ fn namespaces_and_collisions_are_explicit() {
         .unwrap();
     assert!(registry.include("examples", collision).is_err());
     assert!(!registry.tasks().any(|task| task.name() == "examples:add"));
+    assert!(
+        !registry
+            .tasks()
+            .any(|task| task.name() == "examples:output")
+    );
     let mut context = registry.context(".");
     assert_eq!(context.call("examples:greet", &["Sam"]).unwrap(), "Sam.");
 }

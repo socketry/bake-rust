@@ -16,7 +16,13 @@
   required by standard traits and upstream APIs.
 - Use cargo fmt formatting and safe Rust. Expected failures return Result with
   an actionable message; reserve unwrap and expect for tests or proven invariants.
-- Keep registration explicit. Reusable task libraries use ordinary Cargo dependencies.
+- Mark task functions with `#[bake::task]` and use `Registry::discover()` for normal
+  task binaries. Reference task-library dependencies with `use crate_name as _;`
+  so their registration entries are linked. Put library tasks in semantic modules
+  to define their namespaces. Use manual registry APIs for dynamic naming only.
+- Let the built-in output task format the final result. Mark tasks that handle
+  their own output with `#[bake::task(output)]`; replace the formatter with
+  `Registry::replace` when a project needs different defaults.
 - Use concrete types and established traits. Keep runtime requirements out of
   the synchronous core.
 - Pass task context explicitly. Do not change the process-wide working directory

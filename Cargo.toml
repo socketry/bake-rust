@@ -15,6 +15,7 @@ syn = { version = "2.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 tempfile = "3.27"
+linkme = "0.3"
 
 [workspace.metadata.bake]
 manifest = "bake/Cargo.toml"
@@ -27,7 +28,7 @@ license.workspace = true
 repository.workspace = true
 description = "Composable, typed development tasks for Rust projects"
 readme = "readme.md"
-include = ["src/**", "Cargo.toml", "readme.md", "license.md", "releases.md", "conventions.md", "agent-context.md", "design.md", "releasing.md"]
+include = ["src/**", "Cargo.toml", "readme.md", "license.md", "releases.md", "conventions.md", "agent-context.md", "design.md", "task-libraries.md", "releasing.md"]
 
 [lib]
 name = "bake"
@@ -35,4 +36,8 @@ name = "bake"
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+linkme.workspace = true
 socketry-bake-macros = { version = "0.1.0", path = "crates/macros" }
+
+[dev-dependencies]
+tempfile.workspace = true

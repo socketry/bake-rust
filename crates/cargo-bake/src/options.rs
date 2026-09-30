@@ -41,9 +41,6 @@ impl Options {
                     options.arguments.extend(arguments);
                     break;
                 }
-                Some(value) if value.starts_with("--manifest-path=") => {
-                    options.manifest = Some(value["--manifest-path=".len()..].into());
-                }
                 _ => {
                     options.arguments.push(argument);
                     options.arguments.extend(arguments);

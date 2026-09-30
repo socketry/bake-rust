@@ -17,6 +17,9 @@ fn rejects_unsupported_signatures() {
         "fn example(context: &mut Context, #[bake(context)] other: &mut Context) {}",
         "fn example(#[bake(unknown)] value: String) {}",
         "fn example(#[bake(default = 1, default = 2)] value: usize) {}",
+        "fn example(#[bake(input)] value: String) {}",
+        "fn example(#[bake(input)] first: Value, #[bake(input)] second: Value) {}",
+        "fn example(#[bake(input, named)] value: Value) {}",
     ] {
         assert!(
             expand(quote!(), syn::parse_str(source).unwrap()).is_err(),
@@ -47,6 +50,31 @@ fn rejects_unknown_task_options() {
     assert!(
         expand(
             quote!(unknown),
+            syn::parse_quote!(
+                fn example() {}
+            )
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn output_and_previous_input_options_expand() {
+    let output = expand(
+        quote!(output),
+        syn::parse_quote! {
+            fn render(#[bake(input)] input: Value) -> Result<Value> { Ok(input) }
+        },
+    )
+    .unwrap()
+    .to_string();
+    assert!(output.contains("handles_output"));
+    assert!(output.contains("TASK_REGISTRATIONS"));
+    assert!(output.contains("previous"));
+    assert!(!output.contains("Parameter :: new"));
+    assert!(
+        expand(
+            quote!(output, output),
             syn::parse_quote!(
                 fn example() {}
             )

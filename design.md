@@ -20,9 +20,13 @@ defaults, Option, and Vec make named arguments. Function documentation becomes
 task help. The macro checks unsupported signatures and lets Rust check argument
 traits, output serialization, and the original function body.
 
-Descriptors are explicitly registered. Libraries return registries, and consumers
-choose namespaces when importing them. This provides compile-time dependencies
-and deterministic runtime names without global discovery.
+Each task macro adds a descriptor to a linkme distributed slice. The executable
+uses `Registry::discover()` to collect tasks from itself and linked dependencies.
+Nested Rust modules determine task namespaces, while explicit task names can
+override them. Rust omits unused dependencies from the final link, so each task
+library must be referenced by the executable (an import such as
+`use bake_releases as _;` is enough). This avoids registration code for each task
+while keeping task libraries as ordinary Cargo dependencies.
 
 ## Execution is sequential and contextual
 
@@ -35,13 +39,21 @@ Only the last result is formatted automatically. Tasks decide how to report
 progress and diagnostics. A task error stops the chain and includes its task name.
 Panics retain ordinary Rust behavior and are not treated as recoverable task errors.
 
+Automatic formatting goes through the registered `output` task. It receives the
+last task's result as an injected value. Explicit `output` commands therefore work
+in chains, write to stdout or a project-relative file, and return the original value
+for further processing. Projects can replace the registered output task. A task
+that already emits output can mark itself with `#[bake::task(output)]` to suppress
+the automatic formatter. The `null` task consumes a result without displaying it.
+
 ## Scope
 
-The initial release provides synchronous tasks, explicit registration, typed
+The initial release provides synchronous tasks, link-time discovery, typed
 command-line values, reusable libraries, help, structured output, composition,
-and release-note tasks. It does not automatically discover functions across crates
-or infer a dependency graph. Async execution, richer parsers, and additional release
-automation can be added when a concrete task needs them.
+and release-note tasks. It does not infer a dependency graph: task libraries must
+be Cargo dependencies and referenced by the executable to be linked. Async execution,
+richer parsers, and additional release automation can be added when a concrete task
+needs them.
 
 No Ruby implementation files are vendored. The release task behavior is inspired
 by Samuel Williams's MIT-licensed bake-releases; the Rust implementation is original.

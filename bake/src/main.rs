@@ -1,4 +1,6 @@
 use bake::{Context, Error, Registry, Result, Value};
+// Pull the dependency into the executable so its task descriptors are linked.
+use bake_releases as _;
 use std::process::ExitCode;
 
 /// Greet someone using typed arguments, defaults, and repeatable labels.
@@ -59,25 +61,13 @@ fn prepare(
 ) -> Result<Value> {
     context.call(
         "build:check",
-        &[if offline {
-            "offline=true"
-        } else {
-            "offline=false"
-        }],
+        &["--offline", if offline { "true" } else { "false" }],
     )?;
     context.call("releases:notes", &[&version])
 }
 
 fn run() -> Result<()> {
-    let mut registry = Registry::new();
-    registry
-        .register(greet_task())?
-        .register(add_task())?
-        .register(result_task())?
-        .register(check_task())?
-        .register(prepare_task())?;
-    registry.include("releases", bake_releases::registry()?)?;
-    registry.run()
+    Registry::discover()?.run()
 }
 
 fn main() -> ExitCode {
@@ -87,5 +77,23 @@ fn main() -> ExitCode {
             eprintln!("bake: {error}");
             ExitCode::FAILURE
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn discovers_project_and_dependency_tasks_automatically() {
+        let registry = Registry::discover().unwrap();
+        let names: Vec<_> = registry.tasks().map(|task| task.name()).collect();
+
+        assert!(names.contains(&"greet"));
+        assert!(names.contains(&"build:check"));
+        assert!(names.contains(&"releases:notes"));
+        assert!(names.contains(&"releases:update"));
+        assert!(names.contains(&"output"));
+        assert!(names.contains(&"null"));
     }
 }

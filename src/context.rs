@@ -1,3 +1,4 @@
+use crate::output::Format;
 use crate::registry::Invocation;
 use crate::{Error, Registry, Result, Value};
 use std::any::{Any, TypeId};
@@ -16,6 +17,8 @@ pub struct Context {
     previous: Value,
     state: HashMap<TypeId, Box<dyn Any>>,
     depth: usize,
+    terminal_output: String,
+    default_format: Option<Format>,
 }
 
 impl Context {
@@ -26,6 +29,8 @@ impl Context {
             previous: Value::Null,
             state: HashMap::new(),
             depth: 0,
+            terminal_output: String::new(),
+            default_format: None,
         }
     }
     pub fn root(&self) -> &Path {
@@ -33,6 +38,19 @@ impl Context {
     }
     pub fn previous(&self) -> &Value {
         &self.previous
+    }
+    /// Add user-facing output to the command result. Task diagnostics should use stderr.
+    pub fn write_output(&mut self, output: &str) {
+        self.terminal_output.push_str(output);
+    }
+    pub(crate) fn take_output(&mut self) -> String {
+        std::mem::take(&mut self.terminal_output)
+    }
+    pub(crate) fn set_default_format(&mut self, format: Option<Format>) {
+        self.default_format = format;
+    }
+    pub(crate) fn default_format(&self) -> Option<Format> {
+        self.default_format
     }
     pub fn insert<State: Any>(&mut self, state: State) {
         self.state.insert(TypeId::of::<State>(), Box::new(state));

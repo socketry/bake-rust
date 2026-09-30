@@ -26,8 +26,10 @@ jobs:
         run: cargo bake --locked --list
       - name: Exercise typed tasks and release library
         run: |
-          cargo bake --locked greet Samuel --excited
+          cargo bake --locked greet Samuel --excited true
+          cargo bake --locked greet Samuel output --format json
           cargo bake --locked add 20 22 :: result
+          cargo bake --locked greet Samuel :: null
           cargo bake --locked releases:notes Unreleased
 
   quality:

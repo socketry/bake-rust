@@ -10,7 +10,6 @@ pub struct Parameter {
     pub(crate) positional: bool,
     pub(crate) required: bool,
     pub(crate) repeated: bool,
-    pub(crate) boolean: bool,
     pub(crate) default: Option<String>,
     pub(crate) description: String,
     validate: fn(&str) -> Result<()>,
@@ -28,7 +27,6 @@ impl Parameter {
             positional: true,
             required: true,
             repeated: false,
-            boolean: std::any::type_name::<Value>() == "bool",
             default: None,
             description: String::new(),
             validate: |value| parse::<Value>(value).map(|_| ()),
@@ -139,40 +137,27 @@ impl Arguments {
                 continue;
             }
             let named = if options {
-                token
-                    .strip_prefix("--")
-                    .map(|value| (value, true))
-                    .or_else(|| token.contains('=').then_some((token.as_str(), false)))
+                token.strip_prefix("--")
             } else {
                 None
             };
-            if let Some((name, flag)) = named {
-                let (name, inline_value) = name
-                    .split_once('=')
-                    .map_or((name, None), |(name, value)| (name, Some(value)));
+            if let Some(name) = named {
+                if name.contains('=') {
+                    return Err(Error::new(
+                        "named arguments use separate `--name value` tokens",
+                    ));
+                }
                 let name = name.replace('-', "_");
                 let parameter = parameters
                     .iter()
                     .find(|parameter| parameter.name == name)
                     .ok_or_else(|| Error::new(format!("unknown argument {name:?}")))?;
                 consumed += 1;
-                let value = if let Some(value) = inline_value {
-                    value
-                } else if flag
-                    && parameter.boolean
-                    && !tokens
-                        .get(consumed)
-                        .is_some_and(|value| value == "true" || value == "false")
-                {
-                    "true"
-                } else {
-                    let value = tokens
-                        .get(consumed)
-                        .filter(|value| value.as_str() != "::" && !value.starts_with("--"))
-                        .ok_or_else(|| Error::new(format!("argument {name:?} requires a value")))?;
-                    consumed += 1;
-                    value
-                };
+                let value = tokens
+                    .get(consumed)
+                    .filter(|value| value.as_str() != "::" && value.as_str() != "--")
+                    .ok_or_else(|| Error::new(format!("argument {name:?} requires a value")))?;
+                consumed += 1;
                 arguments.insert(parameter, value)?;
             } else if let Some(parameter) = parameters.iter().find(|parameter| {
                 parameter.positional && !arguments.0.contains_key(&parameter.name)

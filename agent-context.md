@@ -6,14 +6,16 @@ Read conventions.md before changing this repository.
 
 Bake is a Cargo-compatible task runner inspired by Samuel Williams's Ruby Bake.
 The project-local task binary contains ordinary typed Rust functions. The launcher
-discovers and runs that binary through Cargo. Reusable libraries register functions
-under project-selected namespaces.
+discovers and runs that binary through Cargo. `#[bake::task]` registers functions
+for `Registry::discover()`. Nested Rust modules define namespaces; task library
+dependencies must be referenced by the executable to make the linker include them.
 
 ## Source map
 
 - src/arguments.rs: parameter metadata, typed validation, command-line parsing.
 - src/task.rs: task descriptor and handler interface.
 - src/registry.rs: registration, namespaces, command planning, help and output.
+- src/output.rs: replaceable default output, raw/JSON/NDJSON formatting, and null sink.
 - src/context.rs: shared state, project root, previous result, nested calls.
 - crates/macros/: task attribute and generated adapters; re-exported by bake.
 - crates/cargo-bake/: Cargo discovery and process launcher; independent of the core.
@@ -22,12 +24,18 @@ under project-selected namespaces.
 
 ## Important boundaries
 
-- Task registration is explicit; there is no linker inventory or dynamic plugin ABI.
+- Task registration uses linkme's linker inventory. It is static, not a dynamic
+  plugin ABI. Dependencies that contribute tasks must be referenced in the task
+  binary, e.g. `use bake_releases as _;`.
 - The launcher reads Cargo metadata format 1; it does not link Cargo internals.
 - Package-level configuration takes precedence over workspace-level configuration.
 - The core is synchronous. An async runtime can be owned by an individual task.
 - A chain shares one Context. Nested calls use full registered names and update
   previous() on success. Calls are limited to 64 nested invocations.
+- The registry includes `output` and `null`. It invokes `output` after the last task
+  unless that task handles output. Reusable namespace imports skip these built-ins.
+- `#[bake(input)] value: bake::Value` injects the previous result. The default
+  output task returns that result after writing it, so later tasks can reuse it.
 - Supplied values are validated before execution, then parsed by generated adapters.
   Default expressions run at invocation time.
 - Release documents use unindented ATX headings and fenced code blocks. This is
@@ -42,7 +50,7 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 cargo bake --locked --list
-cargo bake --locked greet Samuel --excited
+cargo bake --locked greet Samuel --excited true
 cargo bake --locked releases:notes Unreleased
 ```
 

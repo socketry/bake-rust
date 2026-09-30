@@ -9,12 +9,20 @@ extern crate self as bake;
 mod arguments;
 mod context;
 mod error;
+mod output;
 mod registry;
 mod task;
+
+#[doc(hidden)]
+pub mod __private {
+    pub use crate::registry::{TASK_REGISTRATIONS, TaskRegistration};
+    pub use linkme;
+}
 
 pub use arguments::{Arguments, Parameter};
 pub use context::Context;
 pub use error::{Error, Result};
+pub use output::Format;
 pub use registry::Registry;
 pub use serde_json::Value;
 pub use socketry_bake_macros::task;

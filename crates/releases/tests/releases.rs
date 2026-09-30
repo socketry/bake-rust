@@ -71,25 +71,22 @@ fn tasks_read_and_update_a_custom_document_under_project_root() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("changes.md");
     fs::write(&path, "# Releases\n\n## Unreleased\n\nNew feature.\n").unwrap();
-    let mut registry = bake::Registry::new();
-    registry
-        .include("releases", bake_releases::registry().unwrap())
-        .unwrap();
+    let registry = bake::Registry::discover().unwrap();
     let mut context = registry.context(directory.path());
     assert_eq!(
         context
-            .call("releases:notes", &["Unreleased", "path=changes.md"])
+            .call("releases:notes", &["Unreleased", "--path", "changes.md"])
             .unwrap(),
         "\nNew feature.\n"
     );
     context
-        .call("releases:update", &["v1", "path=changes.md"])
+        .call("releases:update", &["v1", "--path", "changes.md"])
         .unwrap();
     assert!(fs::read_to_string(&path).unwrap().contains("## v1\n"));
     let updated = fs::read(&path).unwrap();
     assert!(
         context
-            .call("releases:update", &["v2", "path=changes.md"])
+            .call("releases:update", &["v2", "--path", "changes.md"])
             .is_err()
     );
     assert_eq!(fs::read(&path).unwrap(), updated);

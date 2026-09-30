@@ -3,16 +3,23 @@
 Reusable releases.md tasks for Bake, inspired by Samuel Williams's
 [Ruby bake-releases](https://github.com/ioquatix/bake-releases) (MIT).
 
-Import the library as bake_releases and register its tasks under your chosen namespace:
+The task functions live under the `releases` module, which becomes the task
+namespace. Add this crate as a dependency and reference it from the task binary
+so Rust links its registration entries:
 
 ```rust,ignore
-registry.include("releases", bake_releases::registry()?)?;
+use bake_releases as _;
+
+bake::Registry::discover()?.run()
 ```
+
+No per-task registration calls are needed. `#[bake::task]` functions in the
+library are collected by `Registry::discover()`.
 
 ```sh
 cargo bake releases:notes Unreleased
 cargo bake releases:update v0.1.0
-cargo bake releases:notes v0.1.0 path=releases.md
+cargo bake releases:notes v0.1.0 --path releases.md
 ```
 
 ## Document format

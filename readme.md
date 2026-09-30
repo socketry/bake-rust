@@ -1,8 +1,8 @@
 # Bake for Rust
 
 Write project tasks as ordinary Rust functions, then run them with `cargo bake`.
-Task functions have typed arguments, generated help, explicit registration, and
-a shared project context. Reusable task libraries are ordinary Cargo dependencies.
+Task functions have typed arguments, generated help, automatic discovery, and a
+shared project context. Reusable task libraries are ordinary Cargo dependencies.
 
 This is an initial implementation inspired by [Ruby Bake](https://github.com/ioquatix/bake),
 [Bake Releases](https://github.com/ioquatix/bake-releases), and Cargo's
@@ -14,7 +14,7 @@ From a checkout, the included Cargo alias bootstraps the launcher:
 
 ```sh
 cargo bake --list
-cargo bake greet Samuel --excited --labels Rust
+cargo bake greet Samuel --excited true --labels Rust
 cargo bake greet --help
 cargo bake add 20 22 :: result
 cargo bake releases:notes Unreleased
@@ -80,28 +80,29 @@ fn greet(name: String, #[bake(default = false)] excited: bool) -> Result<String>
 }
 
 fn main() -> Result<()> {
-    let mut registry = Registry::new();
-    registry.register(greet_task())?;
-    registry.run()
+    Registry::discover()?.run()
 }
 ```
 
 `#[bake::task]` preserves `greet` and generates `greet_task()`, which describes
-the arguments and adapts command-line input to the original function. Registering
-tasks explicitly keeps imports, names, and composition visible in source code.
+the arguments and adapts command-line input to the original function. It also adds
+the descriptor to Bake's link-time registration table. `Registry::discover()`
+collects tasks from the executable and linked task libraries. Nested Rust modules
+form namespaces, so a function in `releases::` becomes `releases:notes`.
 
 ## Arguments and results
 
 | Rust parameter | Command-line behavior |
 | --- | --- |
-| `name: String` | Required positional, also accepts `name=value` or `--name value` |
+| `name: String` | Required positional, also accepts `--name value` |
 | `#[bake(named)] name: String` | Required named argument |
 | `#[bake(default = 3)] count: usize` | Optional named argument with a typed default |
 | `#[bake(default = "releases.md")] path: PathBuf` | String literal converted to the parameter type |
 | `output: Option<PathBuf>` | Optional named argument, defaults to `None` |
 | `labels: Vec<String>` | Repeatable named argument, defaults to an empty vector |
-| `#[bake(default = false)] verbose: bool` | `--verbose`, `--verbose=false`, or `verbose=true` |
+| `#[bake(default = false)] verbose: bool` | `--verbose true` or `--verbose false` |
 | `context: &mut Context` | Injected execution context, omitted from command-line arguments |
+| `#[bake(input)] input: Value` | Injected result from the preceding task in a chain |
 
 Values implement `FromStr`, with a displayable error. Custom argument types can
 implement that trait. Defaults other than string literals must produce the
@@ -109,17 +110,34 @@ parameter's type. Defaults are evaluated when invoking the task. Parameter help
 comes from `#[bake(help = "...")]`; task help comes from Rust documentation comments.
 An explicitly marked `#[bake(context)]` parameter may have another name.
 
-Named arguments also accept `--name=value`; flag names accept hyphens in place
-of underscores. Use `--` before positional values that look like options or
-contain `=`. `::` is reserved as a task separator; a named value can contain it
-using `--name=::`. UTF-8 task arguments are required.
+Named arguments use two tokens: `--name value`. This also applies to boolean and
+repeatable arguments. Equals signs are not a named-argument separator; flag names
+accept hyphens in place of underscores. Use `--` before positional values that
+look like options. `::` is reserved as a task separator. UTF-8 task arguments are
+required.
 
 Task functions return `Result<Output, Error>` where `Output` implements
 `serde::Serialize` and the error implements `Display`. `bake::Result` is a
-convenience alias. The final task's result is printed: strings as text, other
-values as JSON, and `()` silently. A leading `--json` formats the final result
-as JSON, including strings and null. Tasks should use stderr for diagnostics
-when callers need machine-readable stdout.
+convenience alias. After the final task, Bake invokes its registered `output`
+task unless that task handled output itself. The default `output` task prints
+strings as text, structured values as pretty JSON, and `()` silently. A leading
+`--json` selects JSON, including for strings and null. Tasks should use stderr
+for diagnostics when callers need machine-readable stdout.
+
+The built-in `output` task also works in a chain. Its input is the previous
+task's result, and it returns that result for further processing:
+
+```sh
+cargo bake greet Samuel output --format json
+cargo bake releases:notes Unreleased output --file notes.txt
+```
+
+Use `--format raw`, `--format json`, or `--format ndjson`; JSON and NDJSON file
+extensions also select a format. Raw text is the default for other file extensions.
+Output files are relative to the project root, and their parent directories must exist.
+The `null` task consumes a result without printing it. Mark a custom task with
+`#[bake::task(output)]` if it handles output, or replace the default formatter
+with `registry.replace("output", custom_output_task())`.
 
 ## Composition and hooks
 
@@ -139,7 +157,7 @@ Each invocation receives the same `Context`. It provides:
 - `root()` — the project root determined by the launcher.
 - `previous()` — the previous successful task's structured result.
 - `insert`, `get`, `get_mut` — shared state indexed by Rust type.
-- `call("task:name", &["argument=value"])` — invoke one task by its full registered name.
+- `call("task:name", &["--argument", "value"])` — invoke one task by its full registered name.
 - `command("cargo")` — a `std::process::Command` configured to run in the project root.
 
 Hooks are ordinary calls around an operation. For example, this repository's
@@ -149,21 +167,36 @@ do not automatically update `previous()`.
 
 ## Reusable task libraries
 
-A library exports a function returning a registry:
+Task functions in a library are discovered with the same attribute. Put them in
+a semantic module to give them a namespace:
 
 ```rust,ignore
-let mut registry = bake::Registry::new();
-registry.include("releases", bake_releases::registry()?)?;
+pub mod releases {
+    #[bake::task]
+    pub fn notes(/* typed arguments */) -> bake::Result<String> {
+        // ...
+    }
+}
 ```
 
-The project chooses the namespace. Duplicate registrations are errors, and a
-namespace import with collisions leaves the destination registry unchanged.
-The included [release library](crates/releases/readme.md) provides:
+Add the library as a Cargo dependency and reference it from the task binary so
+Rust includes its registration entries in the link:
+
+```rust,ignore
+use bake_releases as _;
+
+bake::Registry::discover()?.run()
+```
+
+This removes per-task registration and namespace boilerplate. Explicit
+`Registry::register` and `Registry::include` remain available when a project needs
+to assemble names dynamically. Duplicate discovered names are errors. The
+included [release library](crates/releases/readme.md) provides:
 
 ```sh
 cargo bake releases:notes Unreleased
 cargo bake releases:update v0.1.0
-cargo bake releases:notes v0.1.0 path=releases.md
+cargo bake releases:notes v0.1.0 --path releases.md
 ```
 
 `update` renames the `Unreleased` heading in the file. It does not change package
@@ -183,13 +216,14 @@ manifest = "development/Cargo.toml"
 `[package.metadata.bake]` takes precedence for the selected package; its path and
 execution root are relative to that package. Workspace configuration is relative
 to the workspace root. `--manifest-path PATH` selects the **project** manifest.
+Options that take values use a separate following argument.
 
 The task package must have one binary, or select it with `package.default-run`.
 It can belong to the project workspace, or be a separate workspace excluded from
 the parent. A separate task workspace has its own dependency resolution and lockfile.
 
-Launcher options (`--manifest-path`, `--offline`, `--locked`, `--release`) go before
-the task name. Everything from the first task argument onward is forwarded intact.
+Launcher options (`--manifest-path PATH`, `--offline`, `--locked`, `--release`) go
+before the task name. Everything from the first task argument onward is forwarded intact.
 `cargo bake --help` explains the launcher without compiling tasks; `--list` and
 `TASK --help` compile and query the project's task registry. Child exit codes
 are preserved. Process arguments are passed directly, without a shell.
@@ -207,4 +241,5 @@ Tasks are synchronous in this initial implementation. An individual task can
 start a runtime or a subprocess; Bake imposes no async runtime dependency.
 
 See [conventions](conventions.md), [agent context](agent-context.md),
-[design](design.md), and [release process](releasing.md).
+[task library structure](task-libraries.md), [design](design.md), and
+[release process](releasing.md).

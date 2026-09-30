@@ -82,7 +82,8 @@ fn workspace_discovery_from_a_member_preserves_arguments_and_root() {
             "--offline",
             "greet",
             "a name with spaces",
-            "--option=value",
+            "--option",
+            "value",
             "::",
             "second",
         ],
@@ -90,11 +91,9 @@ fn workspace_discovery_from_a_member_preserves_arguments_and_root() {
     let root = project.path().canonicalize().unwrap();
     assert!(output.contains(&format!("ROOT:{}\n", root.display())));
     assert!(output.contains(&format!("DIRECTORY:{}\n", root.display())));
-    assert!(
-        output.contains(
-            "ARG:greet\nARG:a name with spaces\nARG:--option=value\nARG:::\nARG:second\n"
-        )
-    );
+    assert!(output.contains(
+        "ARG:greet\nARG:a name with spaces\nARG:--option\nARG:value\nARG:::\nARG:second\n"
+    ));
 }
 
 #[test]
@@ -130,7 +129,7 @@ fn package_metadata_has_priority_and_uses_package_root() {
     );
     let output = success(launch(
         project.path(),
-        &["--manifest-path=application/Cargo.toml", "--offline"],
+        &["--manifest-path", "application/Cargo.toml", "--offline"],
     ));
     assert!(output.contains(
         &format!("ROOT:{}\n", project.path().join("application").canonicalize().unwrap().display())
