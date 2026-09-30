@@ -18,7 +18,8 @@ cargo bake greet Samuel --excited true --labels Rust
 cargo bake greet --help
 cargo bake add 20 22 :: result
 cargo bake releases:notes Unreleased
-cargo bake releases:cargo:packages
+cargo bake cargo:packages
+cargo bake license:update
 ```
 
 The task crate is [bake/](bake/src/main.rs). Cargo compiles it on demand and caches
@@ -198,25 +199,26 @@ to assemble names dynamically. Duplicate discovered names are errors. The
 cargo bake releases:notes Unreleased
 cargo bake releases:update v0.1.0
 cargo bake releases:notes v0.1.0 --path releases.md
-cargo bake releases:github:release v0.1.0 --draft true
 ```
 
 `update` renames the `Unreleased` heading in the file. It does not change package
 versions, commit, tag, or publish. Release headings use the documented ATX format
 such as `## v0.1.0`.
 
-`releases:github:release` creates a GitHub Release using that heading's notes.
-It requires an existing remote tag and an authenticated GitHub CLI; it publishes
-the release immediately unless `--draft true` is supplied.
+The companion [Bake Cargo](https://github.com/socketry/bake-cargo-rust) library
+provides Cargo workspace tasks, GitHub release creation, publishing workflow
+generation, GitHub release protections, and crates.io trusted publishers. Its
+shared version tasks run `license:update` automatically. `cargo:release`
+validates and packages a candidate for a reviewed release pull request. After
+the pull request merges, the workflow waits for the `crates-io` environment
+approval, publishes the workspace through trusted publishing, and creates the
+`vVERSION` tag after all uploads succeed. The initial publish can be followed by
+trusted-publisher setup with the explicit `cargo:bootstrap PACKAGE` task. Review
+its effects and package contents before invoking it.
 
-The companion [Bake Cargo Releases](https://github.com/socketry/bake-releases-cargo-rust)
-library provides tasks to generate a GitHub Actions publishing workflow,
-configure GitHub release protections, and register crates.io trusted publishers.
-It also provides the shared version tasks and `releases:cargo:release`, which
-packages the workspace, pushes a `vVERSION` tag, and triggers the trusted
-publishing workflow. The initial publish can be followed by trusted-publisher
-setup with the explicit `releases:cargo:bootstrap PACKAGE` task. Review its
-effects and package contents before invoking it.
+The separately reusable [Bake License](https://github.com/socketry/bake-license-rust)
+library tracks Git authorship, refreshes `license.md`, removes the README License
+section, and updates Rust source copyright headers.
 
 ## Discovery and configuration
 
@@ -250,11 +252,13 @@ are preserved. Process arguments are passed directly, without a shell.
 | `socketry-bake` | `bake` | Registry, arguments, context, task result handling |
 | `bake-macros` | `bake_macros` | Function attribute, re-exported by `bake` |
 | `socketry-cargo-bake` | `cargo-bake` | Project discovery and Cargo launcher |
-| `bake-releases` | `bake_releases` | Reusable release-document and GitHub release tasks ([repository](https://github.com/socketry/bake-releases-rust)) |
-| `bake-releases-cargo` | `bake_releases_cargo` | Cargo, GitHub Actions, and crates.io release tasks ([repository](https://github.com/socketry/bake-releases-cargo-rust)) |
+| `bake-releases` | `bake_releases` | Release-document tasks ([repository](https://github.com/socketry/bake-releases-rust)) |
+| `bake-cargo` | `bake_cargo` | Cargo project and release tasks ([repository](https://github.com/socketry/bake-cargo-rust)) |
+| `bake-license` | `bake_license` | License and copyright maintenance tasks ([repository](https://github.com/socketry/bake-license-rust)) |
 
-For local development of the task binary, check out both release task repositories
-beside this repository as `../bake-releases-rust` and `../bake-releases-cargo-rust`.
+For local development of the task binary, check out the task repositories beside
+this repository as `../bake-releases-rust`, `../bake-cargo-rust`, and
+`../bake-license-rust`.
 
 Tasks are synchronous in this initial implementation. An individual task can
 start a runtime or a subprocess; Bake imposes no async runtime dependency.

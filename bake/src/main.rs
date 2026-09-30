@@ -1,7 +1,8 @@
 use bake::{Context, Error, Registry, Result, Value};
 // Pull the dependency into the executable so its task descriptors are linked.
+use bake_cargo as _;
+use bake_license as _;
 use bake_releases as _;
-use bake_releases_cargo as _;
 use std::process::ExitCode;
 
 /// Greet someone using typed arguments, defaults, and repeatable labels.

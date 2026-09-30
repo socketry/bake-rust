@@ -113,8 +113,10 @@ This keeps the main library's dependencies smaller, at the cost of one extra
 package dependency for projects that want its tasks.
 
 For a working example, see [Bake Releases](https://github.com/socketry/bake-releases-rust), whose
-`releases` module provides the `releases:notes`, `releases:update`, and
-`releases:github:release` tasks. The companion [Bake Cargo Releases](https://github.com/socketry/bake-releases-cargo-rust) crate adds
-workspace package discovery, publish-workflow generation, GitHub ruleset and
-environment setup, crates.io trusted-publisher configuration, shared Cargo
-version changes, and version-tagged workspace releases.
+`releases` module provides `releases:notes` and `releases:update`. The [Bake
+Cargo](https://github.com/socketry/bake-cargo-rust) crate adds Cargo workspace
+discovery, package publishing, GitHub release creation, publish-workflow
+generation, GitHub ruleset and environment setup, crates.io trusted-publisher
+configuration, shared Cargo version changes, and release-candidate checks. Its
+version tasks link [Bake License](https://github.com/socketry/bake-license-rust)
+and run `license:update` after changing versions.

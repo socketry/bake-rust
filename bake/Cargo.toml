@@ -6,5 +6,6 @@ publish = false
 
 [dependencies]
 bake = { package = "socketry-bake", path = ".." }
-bake-releases = { version = "0.1.0", path = "../../bake-releases-rust" }
-bake-releases-cargo = { version = "0.1.0", path = "../../bake-releases-cargo-rust" }
+bake-releases = { version = "0.2.0", path = "../../bake-releases-rust" }
+bake-cargo = { version = "0.1.0", path = "../../bake-cargo-rust" }
+bake-license = { version = "0.1.0", path = "../../bake-license-rust" }
