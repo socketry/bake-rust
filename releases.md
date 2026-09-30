@@ -1,5 +1,12 @@
 # Releases
 
+## v0.17.0
+
+- Publish the core library under the `bake` package name.
+- Publish task authoring and development guides under `context/`.
+- Add Bake Agent Context tasks to the project task executable.
+- Move repository-only conventions and release instructions under `.agents/`.
+
 ## v0.2.1
 
 - Add optional namespaced task hooks for composing project-specific automation.

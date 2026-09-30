@@ -77,8 +77,8 @@ prefix.
 
 The same crate can export normal Rust APIs and Bake tasks. A task function is
 still callable as an ordinary function; the attribute also generates its task
-descriptor and registration entry. It needs a dependency on `socketry-bake` so
-it can use the attribute and Bake types.
+descriptor and registration entry. It needs a dependency on `bake` so it can
+use the attribute and Bake types.
 
 ## Consume task libraries
 
@@ -87,13 +87,15 @@ reference it once so its registration entries are linked:
 
 ```toml
 [dependencies]
-bake = { package = "socketry-bake", version = "0.1" }
+bake = "0.17"
 socketry_executor = { package = "socketry-executor", version = "0.1" }
+bake_agent_context = "0.1"
 ```
 
 ```rust,ignore
 // src/main.rs
 use socketry_executor as _;
+use bake_agent_context as _;
 
 fn main() -> bake::Result<()> {
     bake::Registry::discover()?.run()
@@ -105,6 +107,12 @@ names define its task namespaces, and `Registry::discover()` reports an error
 if two linked crates register the same task name. A crate used only as a normal
 Rust dependency does not need to expose a Bake executable; Cargo does not run a
 dependency's binary target when building your application.
+
+The `bake-agent-context` task library adds `agent:context:list`,
+`agent:context:show`, `agent:context:install`, and `agent:context:agents-md` to
+the same executable. Run `cargo bake agent:context:install` to copy context from
+resolved dependencies into `.agents/context/` and update `agents.md`. Ignore
+`.agents/context/` because it is generated from the resolved dependencies.
 
 If ordinary users of a library should not inherit its Bake dependency, put the
 tasks in a separate companion crate, such as `socketry-executor-bake`. The

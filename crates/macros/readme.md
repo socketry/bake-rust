@@ -1,6 +1,6 @@
 # Bake task macros
 
-Procedural macros for socketry-bake. Most users access the attribute through
+Procedural macros for `bake`. Most users access the attribute through
 `#[bake::task]`, re-exported by the core library.
 
 The attribute preserves the original synchronous function and generates a sibling

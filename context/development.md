@@ -1,6 +1,7 @@
-# Agent context
+# Development Context
 
-Read conventions.md before changing this repository.
+This guide summarizes the implementation and task composition in the Bake
+repository. It complements the public usage guides in this directory.
 
 ## Purpose
 
@@ -25,6 +26,8 @@ dependencies must be referenced by the executable to make the linker include the
   Cargo workspace, version, GitHub release, and publishing tasks.
 - [bake-license-rust](https://github.com/socketry/bake-license-rust):
   license documents and Rust source copyright maintenance.
+- [bake-agent-context-rust](https://github.com/socketry/bake-agent-context-rust):
+  dependency context discovery, inspection, and installation.
 - bake/: this repository's task binary and examples of composition.
 
 The task binary loads reusable task libraries from sibling checkouts. The CI
@@ -69,5 +72,7 @@ The initial implementation and tests were developed on macOS. The GitHub workflo
 also runs on Linux and Windows. Inspect the actual workflow results before claiming
 verification on another platform.
 
-For publication order and required registry setup, see releasing.md. Publishing
-must be explicitly requested; ordinary development commands do not release anything.
+For publication order and required registry setup, see the repository's
+[release instructions](https://github.com/socketry/bake-rust/blob/main/.agents/releasing.md).
+Publishing must be explicitly requested; ordinary development commands do not
+release anything.
