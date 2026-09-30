@@ -1,0 +1,55 @@
+name: Publish to crates.io
+
+on:
+  push:
+    tags:
+      - "socketry-bake-v*"
+      - "socketry-bake-macros-v*"
+      - "socketry-bake-releases-v*"
+      - "socketry-cargo-bake-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: crates-io
+    concurrency: publish-${{ github.ref }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Validate package and version from release tag
+        id: package
+        shell: bash
+        run: |
+          cargo metadata --format-version 1 --no-deps --locked > "$RUNNER_TEMP/bake-metadata.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          name, version = os.environ["GITHUB_REF_NAME"].rsplit("-v", 1)
+          allowed = {"socketry-bake", "socketry-bake-macros", "socketry-bake-releases", "socketry-cargo-bake"}
+          if name not in allowed:
+              raise SystemExit(f"Unsupported package: {name}")
+          metadata = json.loads((Path(os.environ["RUNNER_TEMP"]) / "bake-metadata.json").read_text())
+          package = next(package for package in metadata["packages"] if package["name"] == name)
+          if package["version"] != version:
+              raise SystemExit(f"Tag version {version} does not match manifest version {package['version']}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"name={name}\n")
+          PY
+      - name: Run workspace tests
+        run: cargo test --workspace --locked
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Publish package
+        run: cargo publish --package "$BAKE_PACKAGE" --locked
+        env:
+          BAKE_PACKAGE: ${{ steps.package.outputs.name }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

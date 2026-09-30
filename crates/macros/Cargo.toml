@@ -1,0 +1,16 @@
+[package]
+name = "socketry-bake-macros"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Function task descriptors for socketry-bake"
+readme = "readme.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn.workspace = true
+quote.workspace = true
+proc-macro2.workspace = true

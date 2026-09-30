@@ -1,0 +1,37 @@
+use std::fmt;
+
+/// An actionable task, argument, registration, or process error.
+#[derive(Debug)]
+pub struct Error {
+    message: String,
+}
+
+impl Error {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Self {
+        Self::new(error.to_string())
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(error: serde_json::Error) -> Self {
+        Self::new(error.to_string())
+    }
+}
+
+pub type Result<Output = ()> = std::result::Result<Output, Error>;

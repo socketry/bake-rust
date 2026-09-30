@@ -1,0 +1,15 @@
+[package]
+name = "socketry-bake-releases"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Reusable releases.md tasks for Bake"
+readme = "readme.md"
+
+[lib]
+name = "bake_releases"
+
+[dependencies]
+bake = { package = "socketry-bake", version = "0.1.0", path = "../.." }
+tempfile.workspace = true

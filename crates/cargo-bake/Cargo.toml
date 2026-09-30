@@ -1,0 +1,19 @@
+[package]
+name = "socketry-cargo-bake"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Cargo launcher for project-local Bake tasks"
+readme = "readme.md"
+
+[[bin]]
+name = "cargo-bake"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
