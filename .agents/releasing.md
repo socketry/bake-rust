@@ -15,8 +15,8 @@ and one release tag. Creating a GitHub repository or pushing main does not publi
 3. Run the workspace tests and the formatting/Clippy checks.
 4. Commit the reviewed release changes.
 
-The version tasks update Cargo manifests and local path dependency requirements,
-refresh `Cargo.lock`, and then invoke the optional `cargo:after_version_bump`
+The version tasks update Cargo manifests and version requirements for
+in-workspace dependencies, refresh `Cargo.lock`, and then invoke the optional `cargo:after_version_bump`
 task if the project defines it. This repository's hook updates its license and
 release notes. The version tasks do not commit the changes.
 

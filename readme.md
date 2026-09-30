@@ -61,7 +61,7 @@ In the project's `Cargo.toml`:
 members = ["bake"]
 ```
 
-In `bake/Cargo.toml`, use a path to your Bake checkout during development:
+In `bake/Cargo.toml`, depend on Bake by its published crate version:
 
 ```toml
 [package]
@@ -71,11 +71,8 @@ edition = "2024"
 publish = false
 
 [dependencies]
-bake = { path = "../../bake-rust" }
+bake = "0.17"
 ```
-
-Adjust that path for your directory layout. After publishing, use
-`bake = "0.17"` instead of the path dependency.
 
 In `bake/src/main.rs`:
 

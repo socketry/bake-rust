@@ -19,12 +19,6 @@ jobs:
         runner: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
-      - name: Check out the release task libraries for local development
-        run: |
-          git clone --depth 1 --branch main https://github.com/socketry/bake-releases-rust.git ../bake-releases-rust
-          git clone --depth 1 --branch main https://github.com/socketry/bake-cargo-rust.git ../bake-cargo-rust
-          git clone --depth 1 --branch main https://github.com/socketry/bake-license-rust.git ../bake-license-rust
-          git clone --depth 1 --branch main https://github.com/socketry/bake-agent-context-rust.git ../bake-agent-context-rust
       - uses: dtolnay/rust-toolchain@stable
       - name: Run workspace and documentation tests
         run: cargo test --workspace --locked
@@ -43,12 +37,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - name: Check out the release task libraries for local development
-        run: |
-          git clone --depth 1 --branch main https://github.com/socketry/bake-releases-rust.git ../bake-releases-rust
-          git clone --depth 1 --branch main https://github.com/socketry/bake-cargo-rust.git ../bake-cargo-rust
-          git clone --depth 1 --branch main https://github.com/socketry/bake-license-rust.git ../bake-license-rust
-          git clone --depth 1 --branch main https://github.com/socketry/bake-agent-context-rust.git ../bake-agent-context-rust
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
