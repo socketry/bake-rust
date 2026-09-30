@@ -264,6 +264,7 @@ are preserved. Process arguments are passed directly, without a shell.
 | `bake-releases` | `bake_releases` | Release-document tasks ([repository](https://github.com/socketry/bake-releases-rust)) |
 | `bake-cargo` | `bake_cargo` | Cargo project and release tasks ([repository](https://github.com/socketry/bake-cargo-rust)) |
 | `bake-license` | `bake_license` | License and copyright maintenance tasks ([repository](https://github.com/socketry/bake-license-rust)) |
+| `bake-agent-context` | `bake_agent_context` | Dependency context tasks ([repository](https://github.com/socketry/bake-agent-context-rust)) |
 
 For local development of the task binary, check out the task repositories beside
 this repository as `../bake-releases-rust`, `../bake-cargo-rust`, and
@@ -272,6 +273,16 @@ this repository as `../bake-releases-rust`, `../bake-cargo-rust`, and
 Tasks are synchronous in this initial implementation. An individual task can
 start a runtime or a subprocess; Bake imposes no async runtime dependency.
 
-See [conventions](conventions.md), [agent context](agent-context.md),
-[task library structure](task-libraries.md), [design](design.md), and
-[release process](releasing.md).
+## Context
+
+This crate includes [development context](context/development.md), a
+[design overview](context/design.md), and a guide to
+[structuring and using task libraries](context/task-libraries.md). The local
+task executable also includes Bake Agent Context, so run
+`cargo bake agent:context:install` to install context from its dependencies.
+The generated `.agents/context/` directory is ignored by Git.
+
+For repository-only conventions, see
+[.agents/conventions.md](https://github.com/socketry/bake-rust/blob/main/.agents/conventions.md).
+For the release process, see
+[.agents/releasing.md](https://github.com/socketry/bake-rust/blob/main/.agents/releasing.md).

@@ -27,6 +27,7 @@ jobs:
           git clone --depth 1 --branch main https://github.com/socketry/bake-releases-rust.git ../bake-releases-rust
           git clone --depth 1 --branch main https://github.com/socketry/bake-cargo-rust.git ../bake-cargo-rust
           git clone --depth 1 --branch main https://github.com/socketry/bake-license-rust.git ../bake-license-rust
+          git clone --depth 1 --branch main https://github.com/socketry/bake-agent-context-rust.git ../bake-agent-context-rust
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
@@ -148,6 +149,7 @@ jobs:
           git clone --depth 1 --branch main https://github.com/socketry/bake-releases-rust.git ../bake-releases-rust
           git clone --depth 1 --branch main https://github.com/socketry/bake-cargo-rust.git ../bake-cargo-rust
           git clone --depth 1 --branch main https://github.com/socketry/bake-license-rust.git ../bake-license-rust
+          git clone --depth 1 --branch main https://github.com/socketry/bake-agent-context-rust.git ../bake-agent-context-rust
       - uses: dtolnay/rust-toolchain@stable
       - name: Find workspace packages that need publishing
         id: packages
