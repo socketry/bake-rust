@@ -1,6 +1,6 @@
 # Releasing
 
-The workspace is at version 0.2.0. All publishable packages share one version
+The workspace is at version 0.17.0. All publishable packages share one version
 and one release tag. Creating a GitHub repository or pushing main does not publish crates.
 
 ## Preparation
@@ -20,16 +20,20 @@ refresh `Cargo.lock`, and then invoke the optional `cargo:after_version_bump`
 task if the project defines it. This repository's hook updates its license and
 release notes. The version tasks do not commit the changes.
 
-## First publication
+## First publication as `bake`
 
-From a machine authenticated with crates.io, publish the workspace:
+The `bake` crate name has historical yanked versions through 0.16.0, so this
+workspace begins with version 0.17.0. From a machine authenticated with
+crates.io, publish the workspace:
 
 ```sh
 cargo publish --workspace --locked
 ```
 
-Cargo selects the publishable workspace packages and skips the unpublished
-`bake-rust-tasks` package.
+Cargo publishes the workspace packages in dependency order and skips the
+unpublished `bake-rust-tasks` package. The first `bake` upload must use a local
+crates.io token because trusted publishing can only be configured after the
+crate exists. Configure the GitHub trusted publisher after that upload.
 
 Package names are candidates until the registry accepts them; this repository
 does not reserve names by itself. Review the package contents with cargo package
@@ -68,13 +72,17 @@ bypass environment reviewers by default; disable administrator bypass in the
 environment settings if approval must also be mandatory for administrators.
 
 The release-task libraries are maintained in their own repositories and have
-independent versions and `releases.md` files. See the
+independent versions and `releases.md` files. The core task runner temporarily
+uses the published `socketry-bake` crate and current companion releases so the
+initial `bake` package can be published independently. After the companions
+move to `bake`, update the private task runner to use the new crate and current
+companion task libraries. See the
 [Bake Releases](https://github.com/socketry/bake-releases-rust) and
 [Bake Cargo](https://github.com/socketry/bake-cargo-rust) repositories for their
 release instructions. Cargo version tasks depend on
 [Bake License](https://github.com/socketry/bake-license-rust), which is also
-published independently. For the first publication, publish `socketry-bake`,
-then `bake-releases` and `bake-license`, and finally `bake-cargo`.
+published independently. Release the companion crates after `bake 0.17.0` is
+available; `bake-cargo` depends on the updated releases and license packages.
 
 For later releases, prepare the candidate and commit the version, release-note
 changes, and other release edits together in a pull request:

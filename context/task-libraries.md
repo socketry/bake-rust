@@ -77,8 +77,8 @@ prefix.
 
 The same crate can export normal Rust APIs and Bake tasks. A task function is
 still callable as an ordinary function; the attribute also generates its task
-descriptor and registration entry. It needs a dependency on `socketry-bake` so
-it can use the attribute and Bake types.
+descriptor and registration entry. It needs a dependency on `bake` so it can
+use the attribute and Bake types.
 
 ## Consume task libraries
 
@@ -87,7 +87,7 @@ reference it once so its registration entries are linked:
 
 ```toml
 [dependencies]
-bake = { package = "socketry-bake", version = "0.1" }
+bake = "0.17"
 socketry_executor = { package = "socketry-executor", version = "0.1" }
 bake_agent_context = "0.1"
 ```

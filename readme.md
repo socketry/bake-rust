@@ -32,8 +32,15 @@ cargo install --path crates/cargo-bake --locked
 ```
 
 The executable is `cargo-bake`; Cargo makes it available as `cargo bake`.
-The package names below are prepared for publishing. This repository's initial
-implementation does not imply that those packages have been published.
+The core library package is `bake`, and the launcher package is
+`socketry-cargo-bake`:
+
+```sh
+cargo install socketry-cargo-bake
+```
+
+The earlier `socketry-bake` package remains available for existing projects; use
+`bake` for new projects.
 
 ## Add tasks to a project
 
@@ -64,11 +71,11 @@ edition = "2024"
 publish = false
 
 [dependencies]
-bake = { package = "socketry-bake", path = "../../bake-rust" }
+bake = { path = "../../bake-rust" }
 ```
 
-Adjust that path for your directory layout. Once published, a registry dependency
-can use `version = "0.1"` instead of `path`.
+Adjust that path for your directory layout. After publishing, use
+`bake = "0.17"` instead of the path dependency.
 
 In `bake/src/main.rs`:
 
@@ -258,7 +265,7 @@ are preserved. Process arguments are passed directly, without a shell.
 
 | Published package | Rust library / executable | Purpose |
 | --- | --- | --- |
-| `socketry-bake` | `bake` | Registry, arguments, context, task result handling |
+| `bake` | `bake` | Registry, arguments, context, task result handling |
 | `bake-macros` | `bake_macros` | Function attribute, re-exported by `bake` |
 | `socketry-cargo-bake` | `cargo-bake` | Project discovery and Cargo launcher |
 | `bake-releases` | `bake_releases` | Release-document tasks ([repository](https://github.com/socketry/bake-releases-rust)) |
