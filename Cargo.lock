@@ -9,12 +9,41 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "bake-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "bake-releases"
+version = "0.1.0"
+dependencies = [
+ "socketry-bake",
+ "tempfile",
+]
+
+[[package]]
+name = "bake-releases-cargo"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "socketry-bake",
+ "tempfile",
+ "toml_edit",
+ "ureq",
+]
+
+[[package]]
 name = "bake-rust-tasks"
 version = "0.0.0"
 dependencies = [
+ "bake-releases",
+ "bake-releases-cargo",
  "socketry-bake",
- "socketry-bake-releases",
- "socketry-bake-releases-cargo",
 ]
 
 [[package]]
@@ -493,40 +522,11 @@ checksum = "f9395f0f0eee849a9b707b2f06bb92a6a422090e2123bb2ef8e87a0e61892a8e"
 name = "socketry-bake"
 version = "0.1.0"
 dependencies = [
+ "bake-macros",
  "linkme",
  "serde",
  "serde_json",
- "socketry-bake-macros",
  "tempfile",
-]
-
-[[package]]
-name = "socketry-bake-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "socketry-bake-releases"
-version = "0.1.0"
-dependencies = [
- "socketry-bake",
- "tempfile",
-]
-
-[[package]]
-name = "socketry-bake-releases-cargo"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "socketry-bake",
- "tempfile",
- "toml_edit",
- "ureq",
 ]
 
 [[package]]

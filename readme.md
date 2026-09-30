@@ -248,10 +248,10 @@ are preserved. Process arguments are passed directly, without a shell.
 | Published package | Rust library / executable | Purpose |
 | --- | --- | --- |
 | `socketry-bake` | `bake` | Registry, arguments, context, task result handling |
-| `socketry-bake-macros` | `socketry_bake_macros` | Function attribute, re-exported by `bake` |
+| `bake-macros` | `bake_macros` | Function attribute, re-exported by `bake` |
 | `socketry-cargo-bake` | `cargo-bake` | Project discovery and Cargo launcher |
-| `socketry-bake-releases` | `bake_releases` | Reusable release-document and GitHub release tasks ([repository](https://github.com/socketry/bake-releases-rust)) |
-| `socketry-bake-releases-cargo` | `bake_releases_cargo` | Cargo, GitHub Actions, and crates.io release tasks ([repository](https://github.com/socketry/bake-releases-cargo-rust)) |
+| `bake-releases` | `bake_releases` | Reusable release-document and GitHub release tasks ([repository](https://github.com/socketry/bake-releases-rust)) |
+| `bake-releases-cargo` | `bake_releases_cargo` | Cargo, GitHub Actions, and crates.io release tasks ([repository](https://github.com/socketry/bake-releases-cargo-rust)) |
 
 For local development of the task binary, check out both release task repositories
 beside this repository as `../bake-releases-rust` and `../bake-releases-cargo-rust`.

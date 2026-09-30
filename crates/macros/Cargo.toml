@@ -1,10 +1,10 @@
 [package]
-name = "socketry-bake-macros"
+name = "bake-macros"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Function task descriptors for socketry-bake"
+description = "Function task descriptors for Bake"
 readme = "readme.md"
 
 [lib]

@@ -20,12 +20,12 @@ pub mod __private {
 }
 
 pub use arguments::{Arguments, Parameter};
+pub use bake_macros::task;
 pub use context::Context;
 pub use error::{Error, Result};
 pub use output::Format;
 pub use registry::Registry;
 pub use serde_json::Value;
-pub use socketry_bake_macros::task;
 pub use task::Task;
 
 /// Convert a task's output into the shared, serializable result format.

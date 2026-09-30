@@ -37,7 +37,7 @@ name = "bake"
 serde.workspace = true
 serde_json.workspace = true
 linkme.workspace = true
-socketry-bake-macros = { version = "0.1.0", path = "crates/macros" }
+bake-macros = { version = "0.1.0", path = "crates/macros" }
 
 [dev-dependencies]
 tempfile.workspace = true

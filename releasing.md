@@ -59,8 +59,9 @@ cargo bake releases:cargo:release
 
 The task packages the workspace, creates and pushes a `vVERSION` tag, and the
 GitHub workflow publishes every publishable package from that commit. The
-workflow verifies that all those packages have the tagged version. Do not reuse
-a tag or crates.io version; both are immutable release identifiers.
+workflow verifies that all those packages have the tagged version, skips package
+versions already on crates.io, and fails if the registry cannot be checked. Do
+not reuse a tag or crates.io version; both are immutable release identifiers.
 
 The workflow does not create a GitHub Release automatically. After the tag has
 published the crates, create a GitHub Release from the matching notes with:
