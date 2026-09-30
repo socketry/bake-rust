@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add optional namespaced task hooks for composing project-specific automation.
+
 ## v0.2.0
 
 - Separate Cargo release tasks into `bake-cargo` and add reusable Rust license maintenance in `bake-license`.

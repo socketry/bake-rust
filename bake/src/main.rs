@@ -68,6 +68,15 @@ fn prepare(
     context.call("releases:notes", &[&version])
 }
 
+/// Update project metadata and release notes after a Cargo version bump.
+#[bake::task(name = "cargo:after_version_bump")]
+fn after_version_bump(context: &mut Context, version: String) -> Result<()> {
+    context.call("license:update", &[])?;
+    let release_heading = format!("v{version}");
+    context.call("releases:update", &[&release_heading])?;
+    Ok(())
+}
+
 fn run() -> Result<()> {
     Registry::discover()?.run()
 }
@@ -95,6 +104,7 @@ mod tests {
         assert!(names.contains(&"build:check"));
         assert!(names.contains(&"releases:notes"));
         assert!(names.contains(&"releases:update"));
+        assert!(names.contains(&"cargo:after_version_bump"));
         assert!(names.contains(&"output"));
         assert!(names.contains(&"null"));
     }

@@ -160,12 +160,19 @@ Each invocation receives the same `Context`. It provides:
 - `previous()` — the previous successful task's structured result.
 - `insert`, `get`, `get_mut` — shared state indexed by Rust type.
 - `call("task:name", &["--argument", "value"])` — invoke one task by its full registered name.
+- `call_if_registered("task:name", &[...])` — invoke an optional task,
+  returning `None` if it is not registered.
 - `command("cargo")` — a `std::process::Command` configured to run in the project root.
 
 Hooks are ordinary calls around an operation. For example, this repository's
 `release:prepare` task calls `build:check`, then `releases:notes`. Direct Rust
 function calls are also available when registry dispatch is unnecessary; they
 do not automatically update `previous()`.
+
+Reusable tasks can invoke project-local hooks through the shared registry. The
+`bake-cargo` version tasks optionally call `cargo:after_version_bump`, passing
+the new workspace version. A project can define that task in its private
+`bake/` crate; if it is absent, the version bump continues without a hook.
 
 ## Reusable task libraries
 
@@ -208,11 +215,13 @@ such as `## v0.1.0`.
 The companion [Bake Cargo](https://github.com/socketry/bake-cargo-rust) library
 provides Cargo workspace tasks, GitHub release creation, publishing workflow
 generation, GitHub release protections, and crates.io trusted publishers. Its
-shared version tasks run `license:update` automatically. `cargo:release`
-validates and packages a candidate for a reviewed release pull request. After
-the pull request merges, the workflow waits for the `crates-io` environment
-approval, publishes the workspace through trusted publishing, and creates the
-`vVERSION` tag after all uploads succeed. The initial publish can be followed by
+shared version tasks optionally invoke `cargo:after_version_bump` with the new
+version. This repository defines the hook to run `license:update` and
+`releases:update`. `cargo:release` validates and packages a candidate for a
+reviewed release pull request. After the pull request merges, the workflow waits
+for the `crates-io` environment approval, publishes the workspace through
+trusted publishing, and creates the `vVERSION` tag after all uploads succeed.
+The initial publish can be followed by
 trusted-publisher setup with the explicit `cargo:bootstrap PACKAGE` task. Review
 its effects and package contents before invoking it.
 

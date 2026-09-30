@@ -66,6 +66,16 @@ fn fail() -> Result<()> {
     Err(Error::new("intentional failure"))
 }
 
+#[bake::task(name = "optional:hook")]
+fn optional_hook(value: String) -> Result<String> {
+    Ok(format!("hook:{value}"))
+}
+
+#[bake::task(name = "optional:failure")]
+fn failing_optional_hook() -> Result<()> {
+    Err(Error::new("hook failure"))
+}
+
 static CALLS: AtomicUsize = AtomicUsize::new(0);
 #[bake::task]
 fn effect() -> Result<()> {
@@ -259,6 +269,34 @@ fn nested_tasks_and_recursion_limit() {
     assert!(context.call("previous", &["previous"]).is_err());
     assert!(context.call("fail", &[]).is_err());
     assert_eq!(context.call("add", &["2", "3"]).unwrap(), 5);
+}
+
+#[test]
+fn optional_task_calls_skip_missing_tasks_and_propagate_registered_errors() {
+    let mut context = Registry::new().context(".");
+    assert_eq!(
+        context.call_if_registered("optional:missing", &[]).unwrap(),
+        None
+    );
+
+    let mut registry = Registry::new();
+    registry.register(optional_hook_task()).unwrap();
+    registry.register(failing_optional_hook_task()).unwrap();
+    let mut context = registry.context(".");
+
+    assert_eq!(
+        context
+            .call_if_registered("optional:hook", &["1.2.3"])
+            .unwrap(),
+        Some(Value::String("hook:1.2.3".into()))
+    );
+    assert!(
+        context
+            .call_if_registered("optional:failure", &[])
+            .unwrap_err()
+            .to_string()
+            .contains("hook failure")
+    );
 }
 
 #[test]

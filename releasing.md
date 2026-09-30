@@ -8,18 +8,17 @@ and one release tag. Creating a GitHub repository or pushing main does not publi
 1. Run one of `cargo:version:patch`, `cargo:version:minor`,
    `cargo:version:major`, or `cargo:version:bump --version VERSION` to update
    the workspace packages together.
-2. The version task runs `license:update`, refreshing `license.md`, the README
-   License section, and tracked Rust source copyright headers from Git history.
-   Review those changes; run `cargo bake license:update` directly to refresh them
-   again later.
+2. The version task invokes this project's `cargo:after_version_bump` hook with
+   the new version. The hook runs `license:update` and renames the Unreleased
+   heading in `releases.md` to `vVERSION`. Review those changes and the release
+   notes.
 3. Run the workspace tests and the formatting/Clippy checks.
-4. Rename the Unreleased heading with `cargo bake releases:update vVERSION`. Review
-   the notes with cargo bake releases:notes vVERSION. Add a fresh Unreleased section
-   for subsequent development.
-5. Commit the reviewed release changes.
+4. Commit the reviewed release changes.
 
 The version tasks update Cargo manifests and local path dependency requirements,
-then run `license:update`. They do not update the release notes or commit the changes.
+refresh `Cargo.lock`, and then invoke the optional `cargo:after_version_bump`
+task if the project defines it. This repository's hook updates its license and
+release notes. The version tasks do not commit the changes.
 
 ## First publication
 

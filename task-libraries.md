@@ -118,5 +118,8 @@ Cargo](https://github.com/socketry/bake-cargo-rust) crate adds Cargo workspace
 discovery, package publishing, GitHub release creation, publish-workflow
 generation, GitHub ruleset and environment setup, crates.io trusted-publisher
 configuration, shared Cargo version changes, and release-candidate checks. Its
-version tasks link [Bake License](https://github.com/socketry/bake-license-rust)
-and run `license:update` after changing versions.
+version tasks optionally call a project-defined `cargo:after_version_bump` task
+with the new version. A private `bake/` crate can use that hook to compose
+[Bake License](https://github.com/socketry/bake-license-rust), Bake Releases,
+and other project-specific release tasks. If the hook is not registered, the
+version task simply completes without project-specific updates.

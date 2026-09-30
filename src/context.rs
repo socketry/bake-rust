@@ -84,6 +84,16 @@ impl Context {
         self.invoke(invocations.remove(0))
     }
 
+    /// Invoke a registered task if it exists, returning `None` when it is absent.
+    /// Errors from a registered task are returned unchanged.
+    pub fn call_if_registered(&mut self, name: &str, arguments: &[&str]) -> Result<Option<Value>> {
+        if !self.registry.tasks.contains_key(name) {
+            return Ok(None);
+        }
+
+        self.call(name, arguments).map(Some)
+    }
+
     pub(crate) fn invoke(&mut self, invocation: Invocation) -> Result<Value> {
         if self.depth >= 64 {
             return Err(Error::new(
