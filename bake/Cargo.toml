@@ -8,5 +8,5 @@ publish = false
 bake = "0.17.0"
 bake-agent-context = { version = "0.1.1" }
 bake-releases = { version = "0.2.1" }
-bake-cargo = { version = "0.2.3" }
+bake-cargo = { version = "0.2.4" }
 bake-license = { version = "0.1.1" }
