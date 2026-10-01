@@ -1,5 +1,10 @@
 # Releases
 
+## v0.17.1
+
+- Create or update GitHub Releases after successful crates.io publication.
+- Resolve the local task crate during version updates.
+
 ## v0.17.0
 
 - Publish the core library under the `bake` package name.

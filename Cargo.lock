@@ -10,25 +10,13 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "bake"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
- "bake-macros 0.17.0",
+ "bake-macros",
  "linkme",
  "serde",
  "serde_json",
  "tempfile",
-]
-
-[[package]]
-name = "bake"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9eb0935384477dcff54df7fc3145427aaed736caa55eec674a89093096f40df7"
-dependencies = [
- "bake-macros 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "linkme",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -37,7 +25,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "496c84a9890a2735a88a4e313461beccde1166aa2bd333bd5f4b6daf0c3972ac"
 dependencies = [
- "bake 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bake",
  "serde",
  "serde_json",
 ]
@@ -48,7 +36,7 @@ version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5cee1ca7bf582ae8cc5ecc44123b2d32378a3f69b52df11063cc876b6ae36bcb"
 dependencies = [
- "bake 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bake",
  "bake-license",
  "bake-releases",
  "serde",
@@ -64,24 +52,13 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11feb33128721729f6d5b4f89e7a01d2dc84b658a6232a550f4e10db4e2ab990"
 dependencies = [
- "bake 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bake",
  "tempfile",
 ]
 
 [[package]]
 name = "bake-macros"
-version = "0.17.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "bake-macros"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d61e078d4ef38e2ba1f5218792234621fe10c75e175dd30ca82d7d91e7b91ef"
+version = "0.17.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -94,7 +71,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "066f7e695fb0ce89445358a886ee2bf5eba7d10032f0ffb2527e774f6b567191"
 dependencies = [
- "bake 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bake",
  "tempfile",
 ]
 
@@ -102,7 +79,7 @@ dependencies = [
 name = "bake-rust-tasks"
 version = "0.0.0"
 dependencies = [
- "bake 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bake",
  "bake-agent-context",
  "bake-cargo",
  "bake-license",
@@ -170,7 +147,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys",
 ]
 
 [[package]]
@@ -469,7 +446,7 @@ dependencies = [
  "getrandom 0.2.17",
  "libc",
  "untrusted",
- "windows-sys 0.52.0",
+ "windows-sys",
 ]
 
 [[package]]
@@ -482,7 +459,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys",
 ]
 
 [[package]]
@@ -583,7 +560,7 @@ checksum = "f9395f0f0eee849a9b707b2f06bb92a6a422090e2123bb2ef8e87a0e61892a8e"
 
 [[package]]
 name = "socketry-cargo-bake"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -645,7 +622,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys",
 ]
 
 [[package]]
@@ -768,27 +745,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-link"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
-
-[[package]]
 name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
 dependencies = [
  "windows-targets",
-]
-
-[[package]]
-name = "windows-sys"
-version = "0.61.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
-dependencies = [
- "windows-link",
 ]
 
 [[package]]
