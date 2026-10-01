@@ -290,3 +290,11 @@ For repository-only conventions, see
 [.agents/conventions.md](https://github.com/socketry/bake-rust/blob/main/.agents/conventions.md).
 For the release process, see
 [.agents/releasing.md](https://github.com/socketry/bake-rust/blob/main/.agents/releasing.md).
+
+## Contributing
+
+Please open an issue or pull request on [GitHub](https://github.com/socketry/bake-rust).
+
+### Agent Context
+
+Before contributing, read `agents.md` and the relevant context files it links. If `agents.md` is missing or out of date, run `cargo bake agent:context:install` to install context from dependencies and update the index.
