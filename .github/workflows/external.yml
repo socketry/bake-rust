@@ -15,5 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install the Cargo launcher
+        run: cargo install --path crates/cargo-bake --locked
       - name: Run downstream compatibility tests
         run: cargo bake --locked test:external

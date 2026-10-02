@@ -10,9 +10,11 @@ This is an initial implementation inspired by [Ruby Bake](https://github.com/ioq
 
 ## Try this repository
 
-From a checkout, the included Cargo alias bootstraps the launcher:
+Install the `socketry-cargo-bake` launcher from this checkout, then run the
+project tasks:
 
 ```sh
+cargo install --path crates/cargo-bake --locked
 cargo bake --list
 cargo bake greet Samuel --excited true --labels Rust
 cargo bake greet --help
@@ -25,15 +27,9 @@ cargo bake license:update
 The task crate is [bake/](bake/src/main.rs). Cargo compiles it on demand and caches
 the build. `--offline` and `--locked` are available before the task name.
 
-To install the launcher locally:
-
-```sh
-cargo install --path crates/cargo-bake --locked
-```
-
 The executable is `cargo-bake`; Cargo makes it available as `cargo bake`.
 The core library package is `bake`, and the launcher package is
-`socketry-cargo-bake`:
+`socketry-cargo-bake`. To install the published launcher:
 
 ```sh
 cargo install socketry-cargo-bake
@@ -233,6 +229,9 @@ The separately reusable [Bake License](https://github.com/socketry/bake-license-
 library tracks Git authorship, refreshes `license.md`, removes the README License
 section, and updates Rust source copyright headers.
 
+See the [task library guide](context/task-libraries.md) for more details on
+structuring and using reusable task libraries.
+
 ## Discovery and configuration
 
 The launcher uses `cargo metadata --format-version 1 --no-deps`. From a workspace
@@ -284,20 +283,6 @@ or `bump --version X.Y.Z`), then run `cargo bake cargo:release` and open a
 pull request. After review and merge, GitHub Actions publishes the release
 when the configured `crates-io` environment approves it. See the
 [Cargo publishing guide](https://github.com/socketry/bake-cargo-rust/blob/main/context/publishing.md).
-
-## Context
-
-This crate includes [development context](context/development.md), a
-[design overview](context/design.md), and a guide to
-[structuring and using task libraries](context/task-libraries.md). The local
-task executable also includes Bake Agent Context, so run
-`cargo bake agent:context:install` to install context from its dependencies.
-The generated `.agents/context/` directory is ignored by Git.
-
-For repository-only conventions, see
-[.agents/conventions.md](https://github.com/socketry/bake-rust/blob/main/.agents/conventions.md).
-The shared release instructions are included in the Bake Cargo agent context;
-see the [Cargo publishing guide](https://github.com/socketry/bake-cargo-rust/blob/main/context/publishing.md).
 
 ## Releases
 

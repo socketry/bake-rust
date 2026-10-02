@@ -1,3 +1,0 @@
-[alias]
-# Bootstrap from a checkout without installing the launcher globally.
-bake-local = "run --quiet --package socketry-cargo-bake --bin cargo-bake --"
