@@ -57,6 +57,13 @@ registered tasks are linked into the binary.
 
 ## Useful commands
 
+Install this checkout's `socketry-cargo-bake` launcher before running the Bake
+commands below:
+
+```sh
+cargo install --path crates/cargo-bake --locked
+```
+
 ```sh
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings

@@ -10,9 +10,11 @@ This is an initial implementation inspired by [Ruby Bake](https://github.com/ioq
 
 ## Try this repository
 
-From a checkout, the included Cargo alias bootstraps the launcher:
+Install the `socketry-cargo-bake` launcher from this checkout, then run the
+project tasks:
 
 ```sh
+cargo install --path crates/cargo-bake --locked
 cargo bake --list
 cargo bake greet Samuel --excited true --labels Rust
 cargo bake greet --help
@@ -25,15 +27,9 @@ cargo bake license:update
 The task crate is [bake/](bake/src/main.rs). Cargo compiles it on demand and caches
 the build. `--offline` and `--locked` are available before the task name.
 
-To install the launcher locally:
-
-```sh
-cargo install --path crates/cargo-bake --locked
-```
-
 The executable is `cargo-bake`; Cargo makes it available as `cargo bake`.
 The core library package is `bake`, and the launcher package is
-`socketry-cargo-bake`:
+`socketry-cargo-bake`. To install the published launcher:
 
 ```sh
 cargo install socketry-cargo-bake
