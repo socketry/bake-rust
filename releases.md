@@ -1,6 +1,6 @@
 # Releases
 
-## Unreleased
+## v0.17.3
 
 - Align the Readme's contribution guidance with Bake Readme conventions.
 - Remove the local Bake alias and install the launcher explicitly for repository
