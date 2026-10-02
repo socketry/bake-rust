@@ -22,8 +22,12 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v2
       - name: Install Bake launcher
         run: cargo install socketry-cargo-bake --locked
-      - name: Run workspace tests
+      - name: Run workspace tests with Bake
+        if: runner.os != 'Windows'
         run: cargo bake --locked test
+      - name: Run workspace tests with Cargo on Windows
+        if: runner.os == 'Windows'
+        run: cargo test --workspace --locked
       - name: Exercise task discovery and invocation
         run: |
           cargo bake --locked --list

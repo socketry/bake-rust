@@ -82,11 +82,14 @@ checks those projects against the local workspace crates and keeps their
 checkouts under the ignored `external/` directory. The External Tests workflow
 runs the same task on pushes and pull requests.
 
-The Test workflow follows the shared Rust testing guide: it runs formatting,
-Clippy, and `test:coverage` on Ubuntu. Coverage runs workspace and documentation
-tests, invokes the optional `test:before` hook, and requires 100% line coverage.
-The External Tests workflow is separate because this workspace lists selected
-downstream projects in `[workspace.metadata.bake.test.external]`.
+The Test workflow runs `cargo bake --locked test` on macOS and the coverage task
+on Ubuntu. Windows runs `cargo test --workspace --locked` directly because the
+task runner is part of this workspace and Windows cannot replace its executable
+while it is running. The Ubuntu job also runs formatting and Clippy. Coverage
+runs workspace and documentation tests, invokes the optional `test:before` hook,
+and requires 100% line coverage. The External Tests workflow is separate because
+this workspace lists selected downstream projects in
+`[workspace.metadata.bake.test.external]`.
 
 Follow the current session's instructions about adding or running tests. Use
 --offline with a populated Cargo cache when network access is unavailable.
