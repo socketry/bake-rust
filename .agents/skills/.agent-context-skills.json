@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "socketry-project-github-repository": {
+      "package": "socketry-project",
+      "version": "0.2.5"
+    },
+    "socketry-project-pull-requests": {
+      "package": "socketry-project",
+      "version": "0.2.5"
+    },
+    "socketry-project-setup": {
+      "package": "socketry-project",
+      "version": "0.2.5"
+    }
+  }
+}

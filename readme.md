@@ -1,4 +1,4 @@
-# Bake for Rust
+# `bake`
 
 Write project tasks as ordinary Rust functions, then run them with `cargo bake`.
 Task functions have typed arguments, generated help, automatic discovery, and a
@@ -277,6 +277,14 @@ this repository as `../bake-releases-rust`, `../bake-cargo-rust`, and
 Tasks are synchronous in this initial implementation. An individual task can
 start a runtime or a subprocess; Bake imposes no async runtime dependency.
 
+## Releasing
+
+Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`,
+or `bump --version X.Y.Z`), then run `cargo bake cargo:release` and open a
+pull request. After review and merge, GitHub Actions publishes the release
+when the configured `crates-io` environment approves it. See the
+[Cargo publishing guide](https://github.com/socketry/bake-cargo-rust/blob/main/context/publishing.md).
+
 ## Context
 
 This crate includes [development context](context/development.md), a
@@ -288,8 +296,32 @@ The generated `.agents/context/` directory is ignored by Git.
 
 For repository-only conventions, see
 [.agents/conventions.md](https://github.com/socketry/bake-rust/blob/main/.agents/conventions.md).
-For the release process, see
-[.agents/releasing.md](https://github.com/socketry/bake-rust/blob/main/.agents/releasing.md).
+The shared release instructions are included in the Bake Cargo agent context;
+see the [Cargo publishing guide](https://github.com/socketry/bake-cargo-rust/blob/main/context/publishing.md).
+
+## Releases
+
+<!-- bake-readme:releases:start -->
+See [releases.md](releases.md) for the full release history.
+
+### v0.17.2
+
+- Add `cargo bake --regenerate` to create and synchronize a project's private task crate.
+- Integrate project release, license, agent-context, Readme, and external-test tasks.
+- Add external tests for six downstream Socketry projects.
+
+### v0.17.1
+
+- Create or update GitHub Releases after successful crates.io publication.
+- Resolve the local task crate during version updates.
+
+### v0.17.0
+
+- Publish the core library under the `bake` package name.
+- Publish task authoring and development guides under `context/`.
+- Add Bake Agent Context tasks to the project task executable.
+- Move repository-only conventions and release instructions under `.agents/`.
+<!-- bake-readme:releases:end -->
 
 ## Contributing
 

@@ -1,5 +1,11 @@
 # Releases
 
+## v0.17.2
+
+- Add `cargo bake --regenerate` to create and synchronize a project's private task crate.
+- Integrate project release, license, agent-context, Readme, and external-test tasks.
+- Add external tests for six downstream Socketry projects.
+
 ## v0.17.1
 
 - Create or update GitHub Releases after successful crates.io publication.
