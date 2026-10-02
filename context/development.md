@@ -30,8 +30,9 @@ dependencies must be referenced by the executable to make the linker include the
   dependency context discovery, inspection, and installation.
 - bake/: this repository's task binary and examples of composition.
 
-The task binary loads reusable task libraries from sibling checkouts. The CI
-workflows clone those repositories beside this workspace before building it.
+The task binary links reusable task libraries through dependencies declared in
+`bake/Cargo.toml`; each library must be referenced by the executable so its
+registered tasks are linked into the binary.
 
 ## Important boundaries
 
@@ -61,9 +62,17 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 cargo bake --locked --list
+cargo bake --locked test:external
 cargo bake --locked greet Samuel --excited true
 cargo bake --locked releases:notes Unreleased
 ```
+
+The private task binary links `bake-test-rust`, which registers `test` and
+`test:external`. Selected downstream Bake projects are listed in the root
+`Cargo.toml` under `[workspace.metadata.bake.test.external]`. The external task
+checks those projects against the local workspace crates and keeps their
+checkouts under the ignored `external/` directory. The External Tests workflow
+runs the same task on pushes and pull requests.
 
 Follow the current session's instructions about adding or running tests. Use
 --offline with a populated Cargo cache when network access is unavailable.
@@ -72,7 +81,7 @@ The initial implementation and tests were developed on macOS. The GitHub workflo
 also runs on Linux and Windows. Inspect the actual workflow results before claiming
 verification on another platform.
 
-For publication order and required registry setup, see the repository's
-[release instructions](https://github.com/socketry/bake-rust/blob/main/.agents/releasing.md).
+For release preparation and registry setup, see the shared
+[Cargo publishing guide](https://github.com/socketry/bake-cargo-rust/blob/main/context/publishing.md).
 Publishing must be explicitly requested; ordinary development commands do not
 release anything.

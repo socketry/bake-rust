@@ -12,6 +12,7 @@ pub(crate) struct Options {
     pub(crate) offline: bool,
     pub(crate) locked: bool,
     pub(crate) release: bool,
+    pub(crate) regenerate: bool,
     pub(crate) help: bool,
     pub(crate) version: bool,
     pub(crate) arguments: Vec<OsString>,
@@ -38,6 +39,7 @@ impl Options {
                 Some("--offline") => options.offline = true,
                 Some("--locked") => options.locked = true,
                 Some("--release") => options.release = true,
+                Some("--regenerate") => options.regenerate = true,
                 Some("--help" | "-h") => options.help = true,
                 Some("--version" | "-V") => options.version = true,
                 Some("--") => {

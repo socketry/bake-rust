@@ -7,6 +7,7 @@ use bake_agent_context as _;
 use bake_cargo as _;
 use bake_license as _;
 use bake_releases as _;
+use bake_test_rust as _;
 use std::process::ExitCode;
 
 /// Greet someone using typed arguments, defaults, and repeatable labels.
@@ -72,15 +73,6 @@ fn prepare(
     context.call("releases:notes", &[&version])
 }
 
-/// Update project metadata and release notes after a Cargo version bump.
-#[bake::task(name = "cargo:after_version_bump")]
-fn after_version_bump(context: &mut Context, version: String) -> Result<()> {
-    context.call("license:update", &[])?;
-    let release_heading = format!("v{version}");
-    context.call("releases:update", &[&release_heading])?;
-    Ok(())
-}
-
 fn run() -> Result<()> {
     Registry::discover()?.run()
 }
@@ -113,3 +105,6 @@ mod tests {
         assert!(names.contains(&"null"));
     }
 }
+
+#[path = "bake_generated_tasks/mod.rs"]
+mod bake_generated_tasks;

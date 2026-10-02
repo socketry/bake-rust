@@ -24,6 +24,17 @@ project/
         └── release.rs
 ```
 
+Install the launcher once and bootstrap the task crate with:
+
+```sh
+cargo install socketry-cargo-bake --locked
+cargo bake --regenerate
+```
+
+The command creates `bake/`, adds it to the workspace, and generates a minimal
+binary. Later runs refresh its generated task-library links while preserving
+the project's task source.
+
 `main.rs` can declare modules and start discovery:
 
 ```rust,ignore
@@ -82,8 +93,8 @@ use the attribute and Bake types.
 
 ## Consume task libraries
 
-Add a reusable task library as a dependency of the local task binary, then
-reference it once so its registration entries are linked:
+Add a reusable task library as a dependency of the local task binary, then run
+`cargo bake --regenerate` so its registration entries are linked:
 
 ```toml
 [dependencies]
@@ -92,15 +103,13 @@ socketry_executor = { package = "socketry-executor", version = "0.1" }
 bake_agent_context = "0.1"
 ```
 
-```rust,ignore
-// src/main.rs
-use socketry_executor as _;
-use bake_agent_context as _;
-
-fn main() -> bake::Result<()> {
-    bake::Registry::discover()?.run()
-}
-```
+The first `cargo bake --regenerate` creates the private `bake/` workspace member
+and its minimal binary if they do not exist. Each run regenerates a small source
+file that links unconditional, non-optional, platform-independent direct
+dependencies in `bake/Cargo.toml` (apart from `bake` itself), and adds a module
+declaration to the selected binary if needed. It preserves the rest of the task
+source. Put reusable task libraries in `[dependencies]`; ordinary dependencies
+used by task code are also linked.
 
 No per-task imports or registration calls are needed. The dependency's module
 names define its task namespaces, and `Registry::discover()` reports an error

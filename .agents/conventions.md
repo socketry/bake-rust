@@ -1,7 +1,7 @@
-# Bake Repository Conventions
+# Conventions
 
 - Keep shared Rust conventions in the `bake-agent-context` package. This file records Bake-specific choices.
-- Use semantic Rust modules to define reusable task namespaces. Link task libraries once from the private `bake/` executable with `use crate_name as _;`.
+- Use semantic Rust modules to define reusable task namespaces. Add task libraries to the private `bake/` package and run `cargo bake --regenerate` to link them.
 - Keep project automation in the unpublished `bake/` workspace member. Never publish that package.
 - Keep the core synchronous; task functions may start a runtime or subprocess when needed.
 - Preserve the built-in `output` task behavior. Mark tasks that emit their own final output with `#[bake::task(output)]`.

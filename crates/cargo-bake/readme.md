@@ -19,6 +19,12 @@ access, --locked to require unchanged lockfiles, and --release to use the releas
 Place launcher flags before task arguments. --list and TASK --help are handled by
 the compiled task binary; --help explains the launcher without compiling it.
 
+Install the launcher once with `cargo install socketry-cargo-bake --locked`.
+Run `cargo bake --regenerate` to create the private `bake/` workspace member if
+needed and refresh generated imports for its unconditional, non-optional,
+platform-independent direct dependencies other than `bake` itself. The
+generated module is kept separate from project task source.
+
 Task crates can use any compatible binary implementation; the launcher only sets
 BAKE_PROJECT_ROOT and forwards arguments. Commands execute without a shell and
 child exit codes are preserved.

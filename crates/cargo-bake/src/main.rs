@@ -18,12 +18,19 @@ fn run() -> Result<i32> {
     let options = Options::parse(std::env::args_os().skip(1))?;
     if options.help {
         println!(
-            "cargo bake [OPTIONS] [TASK [ARGUMENTS] [:: TASK ...]]\n\nCompile and run the project's bake/ task crate.\n\nLauncher options (before TASK):\n  --manifest-path PATH  Project Cargo.toml (defaults to nearest ancestor)\n  --offline             Disable Cargo network access\n  --locked              Require unchanged Cargo.lock files\n  --release             Use Cargo's release profile\n  --help                Show this launcher help without compiling tasks\n  --version             Show the launcher version\n\nTask options:\n  --list                List registered tasks\n  --json                Format the final task result as JSON\n  TASK --help           Show task arguments\n\nDefaults: workspace-root/bake/Cargo.toml. Override with\n[workspace.metadata.bake] or [package.metadata.bake] manifest = \"...\"."
+            "cargo bake [OPTIONS] [TASK [ARGUMENTS] [:: TASK ...]]\n\nCompile and run the project's bake/ task crate.\n\nLauncher options (before TASK):\n  --manifest-path PATH  Project Cargo.toml (defaults to nearest ancestor)\n  --offline             Disable Cargo network access\n  --locked              Require unchanged Cargo.lock files\n  --release             Use Cargo's release profile\n  --regenerate          Create or refresh the private Bake task crate\n  --help                Show this launcher help without compiling tasks\n  --version             Show the launcher version\n\nTask options:\n  --list                List registered tasks\n  --json                Format the final task result as JSON\n  TASK --help           Show task arguments\n\nDefaults: workspace-root/bake/Cargo.toml. Override with\n[workspace.metadata.bake] or [package.metadata.bake] manifest = \"...\"."
         );
         return Ok(0);
     }
     if options.version {
         println!("cargo-bake {}", env!("CARGO_PKG_VERSION"));
+        return Ok(0);
+    }
+    if options.regenerate {
+        if !options.arguments.is_empty() {
+            return Err("--regenerate cannot be combined with task arguments".into());
+        }
+        Project::regenerate(&std::env::current_dir()?, &options)?;
         return Ok(0);
     }
     let project = Project::discover(&std::env::current_dir()?, &options)?;
