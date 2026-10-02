@@ -3,6 +3,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+#[cfg(unix)]
 use tempfile::TempDir;
 
 fn root() -> PathBuf {
