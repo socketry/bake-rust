@@ -1,5 +1,9 @@
 # Releases
 
+## Unreleased
+
+- Align the Readme's contribution guidance with Bake Readme conventions.
+
 ## v0.17.2
 
 - Add `cargo bake --regenerate` to create and synchronize a project's private task crate.
