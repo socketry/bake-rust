@@ -306,7 +306,10 @@ fn regeneration_reports_an_invalid_package_workspace_path() {
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
+    #[cfg(unix)]
     assert!(stderr.contains("os error 2"), "unexpected error: {stderr}");
+    #[cfg(windows)]
+    assert!(stderr.contains("os error 3"), "unexpected error: {stderr}");
 }
 
 #[cfg(unix)]
