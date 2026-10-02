@@ -13,6 +13,7 @@ fn root() -> PathBuf {
         .to_path_buf()
 }
 
+#[cfg(unix)]
 fn release_section() -> (String, String) {
     let releases = std::fs::read_to_string(root().join("releases.md")).unwrap();
     let mut heading = None;
