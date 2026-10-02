@@ -14,8 +14,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install the Cargo launcher
-        run: cargo install --path crates/cargo-bake --locked
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - name: Install Bake launcher
+        run: cargo install socketry-cargo-bake --locked
       - name: Run downstream compatibility tests
         run: cargo bake --locked test:external

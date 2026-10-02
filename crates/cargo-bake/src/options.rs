@@ -20,6 +20,10 @@ pub(crate) struct Options {
 
 impl Options {
     pub(crate) fn parse(arguments: impl IntoIterator<Item = OsString>) -> Result<Self> {
+        Self::parse_arguments(arguments.into_iter().collect())
+    }
+
+    fn parse_arguments(arguments: Vec<OsString>) -> Result<Self> {
         let mut arguments = arguments.into_iter().peekable();
         // Cargo external subcommands receive their command name as argument one.
         if arguments.peek().is_some_and(|argument| argument == "bake") {
@@ -63,5 +67,77 @@ impl Options {
         if self.locked {
             command.arg("--locked");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn forwards_tokens_after_a_separator_unchanged() {
+        let options = Options::parse(
+            ["bake", "--locked", "--", "--not-a-launcher-option", "value"].map(OsString::from),
+        )
+        .unwrap();
+
+        assert!(options.locked);
+        assert_eq!(options.arguments, ["--not-a-launcher-option", "value"]);
+    }
+
+    #[test]
+    fn parses_launcher_options_and_rejects_missing_values() {
+        let options = Options::parse(
+            [
+                "--manifest-path",
+                "project/Cargo.toml",
+                "--offline",
+                "--locked",
+                "--release",
+                "--regenerate",
+                "--version",
+            ]
+            .map(OsString::from),
+        )
+        .unwrap();
+
+        assert_eq!(options.manifest, Some(PathBuf::from("project/Cargo.toml")));
+        assert!(options.offline);
+        assert!(options.locked);
+        assert!(options.release);
+        assert!(options.regenerate);
+        assert!(options.version);
+        assert!(Options::parse([OsString::from("--manifest-path")]).is_err());
+
+        assert!(Options::parse([OsString::from("-h")]).unwrap().help);
+        assert!(Options::parse([OsString::from("-V")]).unwrap().version);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn forwards_non_utf8_task_arguments() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let argument = OsString::from_vec(vec![0xff]);
+        let options = Options::parse([argument.clone()]).unwrap();
+
+        assert_eq!(options.arguments, [argument]);
+    }
+
+    #[test]
+    fn forwards_offline_and_locked_options_to_cargo() {
+        let options = Options {
+            offline: true,
+            locked: true,
+            ..Options::default()
+        };
+        let mut command = Command::new("cargo");
+
+        options.configure(&mut command);
+
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            ["--offline", "--locked"]
+        );
     }
 }

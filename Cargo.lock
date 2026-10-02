@@ -30,9 +30,9 @@ dependencies = [
 
 [[package]]
 name = "bake-agent-context"
-version = "0.1.5"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1abaca65c78e91df63ededc74d8afb9a10f0fc17d4998ac976a20397bf389eed"
+checksum = "20e64f12e18f23cf849ce90865403e82171d1e298391896b22782d60b146aa81"
 dependencies = [
  "bake",
  "serde",
@@ -110,13 +110,14 @@ dependencies = [
  "bake-releases",
  "bake-test-rust",
  "socketry-project",
+ "tempfile",
 ]
 
 [[package]]
 name = "bake-test-rust"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "136989b87ba2f507b0a419c56d3a7ef6197b2e5c59fe9923886dabde29a607ea"
+checksum = "700c1aca0c8e83c684ae294337a752bf909005b7a8b4bd3d7e11931a2556b2bb"
 dependencies = [
  "bake",
  "serde_json",
@@ -665,9 +666,9 @@ dependencies = [
 
 [[package]]
 name = "socketry-project"
-version = "0.2.5"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b87558b4520a9c41dff5a095b9c1a541aead57a13a7ea4dc72803bdd27ac089"
+checksum = "71133d087e8322642b7a5256aec7e7d55bc77a2ad4b7ade64a5884ca9a08f216"
 dependencies = [
  "bake",
  "bake-agent-context",

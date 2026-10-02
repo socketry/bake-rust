@@ -57,17 +57,18 @@ registered tasks are linked into the binary.
 
 ## Useful commands
 
-Install this checkout's `socketry-cargo-bake` launcher before running the Bake
-commands below:
+Install `socketry-cargo-bake` before running the Bake commands below:
 
 ```sh
-cargo install --path crates/cargo-bake --locked
+cargo install socketry-cargo-bake --locked
 ```
 
 ```sh
-cargo fmt --all --check
+cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
+cargo bake --locked test --all-targets true
+cargo bake --locked test:coverage --all-targets true
 cargo bake --locked --list
 cargo bake --locked test:external
 cargo bake --locked greet Samuel --excited true
@@ -81,12 +82,20 @@ checks those projects against the local workspace crates and keeps their
 checkouts under the ignored `external/` directory. The External Tests workflow
 runs the same task on pushes and pull requests.
 
+The Test workflow runs `cargo bake --locked test` on macOS and the coverage task
+on Ubuntu. Windows runs `cargo test --workspace --locked` directly because the
+task runner is part of this workspace and Windows cannot replace its executable
+while it is running. The Ubuntu job also runs formatting and Clippy. Coverage
+runs workspace and documentation tests, invokes the optional `test:before` hook,
+and requires 100% line coverage. The External Tests workflow is separate because
+this workspace lists selected downstream projects in
+`[workspace.metadata.bake.test.external]`.
+
 Follow the current session's instructions about adding or running tests. Use
 --offline with a populated Cargo cache when network access is unavailable.
 
-The initial implementation and tests were developed on macOS. The GitHub workflow
-also runs on Linux and Windows. Inspect the actual workflow results before claiming
-verification on another platform.
+Inspect actual workflow results before claiming verification on another
+platform.
 
 For release preparation and registry setup, see the shared
 [Cargo publishing guide](https://github.com/socketry/bake-cargo-rust/blob/main/context/publishing.md).

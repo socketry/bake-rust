@@ -8,6 +8,7 @@ use bake_cargo as _;
 use bake_license as _;
 use bake_releases as _;
 use bake_test_rust as _;
+use std::ffi::OsString;
 use std::process::ExitCode;
 
 /// Greet someone using typed arguments, defaults, and repeatable labels.
@@ -45,8 +46,15 @@ fn result(context: &mut Context) -> Result<Value> {
 /// Check all workspace crates with Cargo. Arguments never pass through a shell.
 #[bake::task(name = "build:check")]
 fn check(context: &mut Context, #[bake(default = false)] offline: bool) -> Result<()> {
-    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-    let mut command = context.command(cargo);
+    check_with(context, offline, cargo_program(std::env::var_os("CARGO")))
+}
+
+fn cargo_program(program: Option<OsString>) -> OsString {
+    program.unwrap_or_else(|| "cargo".into())
+}
+
+fn check_with(context: &mut Context, offline: bool, program: OsString) -> Result<()> {
+    let mut command = context.command(program);
     command.args(["check", "--workspace", "--locked"]);
     if offline {
         command.arg("--offline");
@@ -78,7 +86,11 @@ fn run() -> Result<()> {
 }
 
 fn main() -> ExitCode {
-    match run() {
+    exit_code(run())
+}
+
+fn exit_code(result: Result<()>) -> ExitCode {
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("bake: {error}");
@@ -90,6 +102,7 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bake::{Arguments, Parameter, Task};
 
     #[test]
     fn discovers_project_and_dependency_tasks_automatically() {
@@ -103,6 +116,70 @@ mod tests {
         assert!(names.contains(&"cargo:after_version_bump"));
         assert!(names.contains(&"output"));
         assert!(names.contains(&"null"));
+    }
+
+    fn no_op(_: &mut Context, _: &Arguments) -> Result<Value> {
+        Ok(Value::Null)
+    }
+
+    fn notes(_: &mut Context, arguments: &Arguments) -> Result<Value> {
+        Ok(Value::String(arguments.required::<String>("version")?))
+    }
+
+    #[test]
+    fn exercises_example_tasks_and_cargo_failures() {
+        assert_eq!(greet("Sam".into(), false, vec![]).unwrap(), "Hello, Sam.");
+        assert_eq!(
+            greet("Sam".into(), true, vec!["tag".into()]).unwrap(),
+            "Hello, Sam! [tag]"
+        );
+        assert_eq!(add(20, 22).unwrap(), 42);
+        assert!(add(i64::MAX, 1).is_err());
+
+        assert_eq!(cargo_program(None), "cargo");
+        assert_eq!(cargo_program(Some("custom-cargo".into())), "custom-cargo");
+
+        let directory = tempfile::tempdir().unwrap();
+        let mut context = Registry::new().context(directory.path());
+        assert!(
+            check_with(
+                &mut context,
+                false,
+                directory.path().join("missing-cargo").into()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn runs_release_hook_with_both_offline_values() {
+        let mut registry = Registry::new();
+        registry
+            .register(Task::new(
+                "build:check",
+                "Check.",
+                vec![Parameter::new::<bool>("offline").default("false")],
+                no_op,
+            ))
+            .unwrap();
+        registry
+            .register(Task::new(
+                "releases:notes",
+                "Notes.",
+                vec![Parameter::new::<String>("version")],
+                notes,
+            ))
+            .unwrap();
+        let mut context = registry.context(".");
+
+        assert!(prepare(&mut context, "v0.1.0".into(), false).is_ok());
+        assert!(prepare(&mut context, "v0.1.0".into(), true).is_ok());
+    }
+
+    #[test]
+    fn maps_task_results_to_process_exit_codes() {
+        assert_eq!(exit_code(Ok(())), ExitCode::SUCCESS);
+        assert_eq!(exit_code(Err(Error::new("task failed"))), ExitCode::FAILURE);
     }
 }
 

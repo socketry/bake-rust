@@ -5,6 +5,7 @@
 - Align the Readme's contribution guidance with Bake Readme conventions.
 - Remove the local Bake alias and install the launcher explicitly for repository
   tasks.
+- Require complete line coverage in CI with the standard Bake coverage task.
 
 ## v0.17.2
 
