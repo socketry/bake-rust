@@ -13,6 +13,22 @@ fn root() -> PathBuf {
         .to_path_buf()
 }
 
+#[cfg(unix)]
+fn release_section() -> (String, String) {
+    let releases = std::fs::read_to_string(root().join("releases.md")).unwrap();
+    let mut heading = None;
+
+    for line in releases.lines() {
+        if let Some(current_heading) = line.strip_prefix("## ") {
+            heading = Some(current_heading.to_owned());
+        } else if let (Some(heading), Some(note)) = (heading.as_ref(), line.strip_prefix("- ")) {
+            return (heading.clone(), format!("- {note}"));
+        }
+    }
+
+    panic!("releases.md does not contain a release section with notes");
+}
+
 fn run(arguments: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_bake-rust-tasks"))
         .args(arguments)
@@ -140,13 +156,14 @@ fn propagates_check_failures_and_runs_release_notes_hook() {
     let directory = tempfile::tempdir().unwrap();
     let cargo = fake_cargo(&directory, 7);
     let arguments = directory.path().join("arguments.txt");
+    let (heading, note) = release_section();
 
     let output = run_with_cargo(&["build:check"], &cargo, &arguments);
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("cargo check failed"));
 
     let output = run_with_cargo(
-        &["release:prepare", "Unreleased", "--offline", "true"],
+        &["release:prepare", &heading, "--offline", "true"],
         &cargo,
         &arguments,
     );
@@ -155,11 +172,11 @@ fn propagates_check_failures_and_runs_release_notes_hook() {
 
     let cargo = fake_cargo(&directory, 0);
     let output = stdout(run_with_cargo(
-        &["release:prepare", "Unreleased", "--offline", "true"],
+        &["release:prepare", &heading, "--offline", "true"],
         &cargo,
         &arguments,
     ));
-    assert!(output.contains("Align the Readme's contribution guidance"));
+    assert!(output.contains(&note));
 }
 
 #[cfg(unix)]

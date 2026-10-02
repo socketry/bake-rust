@@ -289,6 +289,13 @@ when the configured `crates-io` environment approves it. See the
 <!-- bake-readme:releases:start -->
 See [releases.md](releases.md) for the full release history.
 
+### v0.17.3
+
+- Align the Readme's contribution guidance with Bake Readme conventions.
+- Remove the local Bake alias and install the launcher explicitly for repository
+  tasks.
+- Require complete line coverage in CI with the standard Bake coverage task.
+
 ### v0.17.2
 
 - Add `cargo bake --regenerate` to create and synchronize a project's private task crate.
@@ -299,13 +306,6 @@ See [releases.md](releases.md) for the full release history.
 
 - Create or update GitHub Releases after successful crates.io publication.
 - Resolve the local task crate during version updates.
-
-### v0.17.0
-
-- Publish the core library under the `bake` package name.
-- Publish task authoring and development guides under `context/`.
-- Add Bake Agent Context tasks to the project task executable.
-- Move repository-only conventions and release instructions under `.agents/`.
 <!-- bake-readme:releases:end -->
 
 ## Contributing
