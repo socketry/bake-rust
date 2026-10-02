@@ -179,3 +179,55 @@ impl Arguments {
         Ok((arguments, consumed))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parameter_exposes_its_name() {
+        let parameter = Parameter::new::<String>("project-name");
+
+        assert_eq!(parameter.name(), "project-name");
+    }
+
+    #[test]
+    fn converts_required_optional_and_repeated_values() {
+        let mut arguments = Arguments::default();
+        assert!(arguments.required::<usize>("missing").is_err());
+        assert_eq!(arguments.optional::<usize>("missing").unwrap(), None);
+        assert_eq!(
+            arguments.repeated::<usize>("missing").unwrap(),
+            Vec::<usize>::new()
+        );
+
+        arguments
+            .0
+            .insert("count".to_owned(), vec!["12".to_owned()]);
+        assert_eq!(arguments.required::<usize>("count").unwrap(), 12);
+        assert_eq!(arguments.optional::<usize>("count").unwrap(), Some(12));
+        assert_eq!(arguments.repeated::<usize>("count").unwrap(), vec![12]);
+
+        arguments
+            .0
+            .insert("invalid".to_owned(), vec!["many".to_owned()]);
+        assert!(arguments.required::<usize>("invalid").is_err());
+        assert!(arguments.optional::<usize>("invalid").is_err());
+        assert!(arguments.repeated::<usize>("invalid").is_err());
+    }
+
+    #[test]
+    fn validates_and_inserts_repeated_arguments() {
+        let parameter = Parameter::new::<usize>("count");
+        let mut arguments = Arguments::default();
+
+        arguments.insert(&parameter, "1").unwrap();
+        assert!(arguments.insert(&parameter, "2").is_err());
+
+        let repeated = parameter.repeated();
+        arguments.insert(&repeated, "2").unwrap();
+        arguments.insert(&repeated, "3").unwrap();
+        assert_eq!(arguments.repeated::<usize>("count").unwrap(), vec![1, 2, 3]);
+        assert!(arguments.insert(&repeated, "not a number").is_err());
+    }
+}

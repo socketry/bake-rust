@@ -6,12 +6,17 @@ mod project;
 
 use options::Options;
 use project::Project;
+use std::ffi::OsString;
 use std::process::{Command, ExitCode};
 
 type Result<Output> = std::result::Result<Output, Box<dyn std::error::Error>>;
 
 fn cargo() -> Command {
-    Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+    Command::new(cargo_program(std::env::var_os("CARGO")))
+}
+
+fn cargo_program(program: Option<OsString>) -> OsString {
+    program.unwrap_or_else(|| "cargo".into())
 }
 
 fn run() -> Result<i32> {
@@ -70,5 +75,16 @@ fn main() -> ExitCode {
             eprintln!("cargo bake: {error}");
             ExitCode::FAILURE
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cargo_program_uses_the_environment_or_default() {
+        assert_eq!(cargo_program(None), "cargo");
+        assert_eq!(cargo_program(Some("custom-cargo".into())), "custom-cargo");
     }
 }

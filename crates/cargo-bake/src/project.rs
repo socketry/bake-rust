@@ -571,3 +571,622 @@ fn add_workspace_member(manifest_path: &Path, member: &str) -> Result<bool> {
     }
     Ok(false)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn document(source: &str) -> DocumentMut {
+        source.parse().unwrap()
+    }
+
+    fn write(path: &Path, contents: &str) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, contents).unwrap();
+    }
+
+    fn target(name: &str, source: &Path) -> Target {
+        Target {
+            name: name.to_owned(),
+            kind: vec!["bin".to_owned()],
+            src_path: source.to_path_buf(),
+        }
+    }
+
+    fn package(
+        root: &Path,
+        targets: Vec<Target>,
+        default_run: Option<&str>,
+        dependencies: Vec<Dependency>,
+    ) -> Package {
+        Package {
+            name: "task-package".to_owned(),
+            manifest_path: root.join("Cargo.toml"),
+            metadata: Value::Null,
+            default_run: default_run.map(str::to_owned),
+            targets,
+            dependencies,
+        }
+    }
+
+    #[test]
+    fn reads_optional_package_and_workspace_manifest_overrides() {
+        assert_eq!(configured_manifest(&Value::Null).unwrap(), None);
+        assert_eq!(
+            configured_manifest(&serde_json::json!({"bake": {"manifest": "tasks/Cargo.toml"}}))
+                .unwrap(),
+            Some("tasks/Cargo.toml")
+        );
+        for metadata in [
+            serde_json::json!({"bake": {"manifest": ""}}),
+            serde_json::json!({"bake": {"manifest": false}}),
+        ] {
+            assert!(configured_manifest(&metadata).is_err());
+        }
+
+        assert_eq!(
+            configured_manifest_from_toml(&DocumentMut::new(), "workspace").unwrap(),
+            None
+        );
+
+        let workspace = document("[workspace.metadata.bake]\nmanifest = \"tasks/Cargo.toml\"\n");
+        assert_eq!(
+            configured_manifest_from_toml(&workspace, "workspace").unwrap(),
+            Some("tasks/Cargo.toml".to_owned())
+        );
+
+        let package = document("[package.metadata.bake]\nmanifest = \"tools/tasks.toml\"\n");
+        assert_eq!(
+            configured_manifest_from_toml(&package, "package").unwrap(),
+            Some("tools/tasks.toml".to_owned())
+        );
+
+        for source in [
+            "[workspace.metadata.bake]\nmanifest = \"\"\n",
+            "[workspace.metadata.bake]\nmanifest = 42\n",
+        ] {
+            assert!(configured_manifest_from_toml(&document(source), "workspace").is_err());
+        }
+    }
+
+    #[test]
+    fn locates_a_workspace_manifest_from_package_and_ancestor_metadata() {
+        let directory = tempdir().unwrap();
+        let root = directory.path();
+        let workspace_manifest = root.join("Cargo.toml");
+        write(&workspace_manifest, "[workspace]\nmembers = []\n");
+
+        let root_document = document("[workspace]\n");
+        assert_eq!(
+            workspace_manifest_for(&workspace_manifest, &root_document).unwrap(),
+            workspace_manifest
+        );
+
+        let package_manifest = root.join("member/Cargo.toml");
+        write(
+            &package_manifest,
+            "[package]\nname = \"member\"\nversion = \"0.1.0\"\nedition = \"2024\"\nworkspace = \"..\"\n",
+        );
+        let package_document = document(
+            "[package]\nname = \"member\"\nversion = \"0.1.0\"\nedition = \"2024\"\nworkspace = \"..\"\n",
+        );
+        assert_eq!(
+            workspace_manifest_for(&package_manifest, &package_document).unwrap(),
+            workspace_manifest.canonicalize().unwrap()
+        );
+
+        let missing_workspace_document = document(
+            "[package]\nname = \"member\"\nversion = \"0.1.0\"\nedition = \"2024\"\nworkspace = \"../missing\"\n",
+        );
+        assert!(workspace_manifest_for(&package_manifest, &missing_workspace_document).is_err());
+
+        let nested_manifest = root.join("member/nested/Cargo.toml");
+        write(
+            &nested_manifest,
+            "[package]\nname = \"nested\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        );
+        let nested_document =
+            document("[package]\nname = \"nested\"\nversion = \"0.1.0\"\nedition = \"2024\"\n");
+        assert_eq!(
+            workspace_manifest_for(&nested_manifest, &nested_document).unwrap(),
+            workspace_manifest.canonicalize().unwrap()
+        );
+    }
+
+    #[test]
+    fn falls_back_when_no_ancestor_is_a_workspace_and_reports_parent_errors() {
+        let directory = tempdir().unwrap();
+        let manifest = directory.path().join("member/Cargo.toml");
+        write(
+            &manifest,
+            "[package]\nname = \"member\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        );
+        let package_document =
+            document("[package]\nname = \"member\"\nversion = \"0.1.0\"\nedition = \"2024\"\n");
+        write(&directory.path().join("Cargo.toml"), "[workspace\n");
+        assert_eq!(
+            workspace_manifest_for(&manifest, &package_document).unwrap(),
+            manifest
+        );
+
+        let package_workspace = document("[package]\nworkspace = \"..\"\n");
+        assert!(workspace_manifest_for(Path::new("/"), &package_workspace).is_err());
+        assert!(workspace_manifest_for(Path::new("/"), &DocumentMut::new()).is_err());
+    }
+
+    #[test]
+    fn locates_package_and_workspace_task_manifest_overrides() {
+        let directory = tempdir().unwrap();
+        let root = directory.path();
+        let workspace_manifest = root.join("Cargo.toml");
+        write(
+            &workspace_manifest,
+            "[workspace]\nmembers = [\"application\"]\n[workspace.metadata.bake]\nmanifest = \"shared/tasks/Cargo.toml\"\n",
+        );
+        let package_manifest = root.join("application/Cargo.toml");
+        write(
+            &package_manifest,
+            "[package]\nname = \"application\"\nversion = \"0.1.0\"\nedition = \"2024\"\nworkspace = \"..\"\n[package.metadata.bake]\nmanifest = \"tools/Cargo.toml\"\n",
+        );
+
+        let location = locate_from_manifest(&package_manifest).unwrap();
+        let package_root = package_manifest.parent().unwrap().canonicalize().unwrap();
+        assert_eq!(location.root, package_root);
+        assert_eq!(location.workspace_root, root.canonicalize().unwrap());
+        assert_eq!(
+            location.task_manifest,
+            package_root.join("tools/Cargo.toml")
+        );
+
+        let workspace_location = locate_from_manifest(&workspace_manifest).unwrap();
+        assert_eq!(workspace_location.root, root.canonicalize().unwrap());
+        assert_eq!(
+            workspace_location.task_manifest,
+            root.canonicalize().unwrap().join("shared/tasks/Cargo.toml")
+        );
+
+        write(
+            &directory.path().join("plain/Cargo.toml"),
+            "[workspace]\nmembers = [\"plain\"]\n",
+        );
+        let package_without_override = directory.path().join("plain/member/Cargo.toml");
+        write(
+            &package_without_override,
+            "[package]\nname = \"member\"\nversion = \"0.1.0\"\nedition = \"2024\"\nworkspace = \"..\"\n[package.metadata.bake]\nmanifest = \"tasks/Cargo.toml\"\n",
+        );
+        let package_location = locate_from_manifest(&package_without_override).unwrap();
+        assert_eq!(
+            package_location.task_manifest,
+            package_without_override
+                .parent()
+                .unwrap()
+                .canonicalize()
+                .unwrap()
+                .join("tasks/Cargo.toml")
+        );
+
+        let isolated = tempdir().unwrap();
+        let no_override_manifest = isolated.path().join("Cargo.toml");
+        write(
+            &no_override_manifest,
+            "[package]\nname = \"standalone\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        );
+        let default_location = locate_from_manifest(&no_override_manifest).unwrap();
+        assert_eq!(
+            default_location.task_manifest,
+            no_override_manifest
+                .parent()
+                .unwrap()
+                .canonicalize()
+                .unwrap()
+                .join("bake/Cargo.toml")
+        );
+    }
+
+    #[test]
+    fn reports_invalid_workspace_task_manifest_configuration() {
+        let directory = tempdir().unwrap();
+        let manifest = directory.path().join("Cargo.toml");
+        write(
+            &manifest,
+            "[workspace]\nmembers = []\n[workspace.metadata.bake]\nmanifest = \"\"\n",
+        );
+
+        assert!(locate_from_manifest(&manifest).is_err());
+
+        assert!(locate_from_manifest(&manifest.with_file_name("missing.toml")).is_err());
+    }
+
+    #[test]
+    fn falls_back_to_manifest_parsing_when_cargo_metadata_fails() {
+        let directory = tempdir().unwrap();
+        write(
+            &directory.path().join("Cargo.toml"),
+            "[package]\nname = \"invalid/name\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        );
+        let mut options = Options {
+            offline: true,
+            ..Options::default()
+        };
+        assert!(Project::locate(directory.path(), &options).is_err());
+
+        options.regenerate = true;
+        assert!(Project::locate(directory.path(), &options).is_ok());
+    }
+
+    #[test]
+    fn discovers_and_regenerates_a_task_package() {
+        let directory = tempdir().unwrap();
+        let root = directory.path();
+        write(
+            &root.join("Cargo.toml"),
+            "[workspace]\nmembers = [\"bake\"]\nresolver = \"3\"\n",
+        );
+        write(
+            &root.join("bake/Cargo.toml"),
+            "[package]\nname = \"example-bake\"\nversion = \"0.0.0\"\nedition = \"2024\"\npublish = false\n",
+        );
+        write(&root.join("bake/src/main.rs"), "fn main() {}\n");
+
+        let options = Options::default();
+        let package_location = Project::locate(&root.join("bake"), &options).unwrap();
+        assert_eq!(package_location.root, root.canonicalize().unwrap());
+
+        let project = Project::discover(root, &options).unwrap();
+        assert_eq!(project.package, "example-bake");
+        assert_eq!(project.binary, "example-bake");
+        assert_eq!(
+            project.task_manifest,
+            root.join("bake/Cargo.toml").canonicalize().unwrap()
+        );
+
+        Project::regenerate(root, &options).unwrap();
+        let source = fs::read_to_string(root.join("bake/src/main.rs")).unwrap();
+        assert!(source.contains("mod bake_generated_tasks;"));
+        assert!(root.join("bake/src/bake_generated_tasks/mod.rs").is_file());
+
+        let empty_workspace = tempdir().unwrap();
+        write(
+            &empty_workspace.path().join("Cargo.toml"),
+            "[workspace]\nmembers = []\nresolver = \"3\"\n",
+        );
+        let error = Project::discover(empty_workspace.path(), &options)
+            .err()
+            .unwrap();
+        assert!(error.to_string().contains("cannot open task manifest"));
+    }
+
+    #[test]
+    fn selects_the_requested_binary_or_requires_one_unambiguous_binary() {
+        let directory = tempdir().unwrap();
+        let single = package(
+            directory.path(),
+            vec![target("first", &directory.path().join("src/main.rs"))],
+            None,
+            vec![],
+        );
+        assert_eq!(selected_binary(&single).unwrap().name, "first");
+
+        let selected = package(
+            directory.path(),
+            vec![
+                target("first", &directory.path().join("src/main.rs")),
+                target("second", &directory.path().join("src/bin/second.rs")),
+            ],
+            Some("second"),
+            vec![],
+        );
+        assert_eq!(selected_binary(&selected).unwrap().name, "second");
+
+        let missing = package(
+            directory.path(),
+            vec![
+                target("first", &directory.path().join("src/main.rs")),
+                target("second", &directory.path().join("src/bin/second.rs")),
+            ],
+            Some("missing"),
+            vec![],
+        );
+        assert!(selected_binary(&missing).is_err());
+
+        let none = package(directory.path(), vec![], None, vec![]);
+        let ambiguous = package(
+            directory.path(),
+            vec![
+                target("first", &directory.path().join("src/main.rs")),
+                target("second", &directory.path().join("src/bin/second.rs")),
+            ],
+            None,
+            vec![],
+        );
+        assert!(selected_binary(&none).is_err());
+        assert!(selected_binary(&ambiguous).is_err());
+    }
+
+    #[test]
+    fn generates_sorted_imports_for_supported_dependencies_only() {
+        let directory = tempdir().unwrap();
+        let dependency = |name: &str,
+                          rename: Option<&str>,
+                          kind: Option<&str>,
+                          optional: bool,
+                          target: Option<&str>| Dependency {
+            name: name.to_owned(),
+            rename: rename.map(str::to_owned),
+            kind: kind.map(str::to_owned),
+            optional,
+            target: target.map(str::to_owned),
+        };
+        let package = package(
+            directory.path(),
+            vec![],
+            None,
+            vec![
+                dependency("z-library", None, None, false, None),
+                dependency("my-library", None, None, false, None),
+                dependency("renamed-package", Some("public-name"), None, false, None),
+                dependency("z-library", None, None, false, None),
+                dependency("development-only", None, Some("dev"), false, None),
+                dependency("optional", None, None, true, None),
+                dependency("platform-only", None, None, false, Some("cfg(unix)")),
+                dependency("bake", None, None, false, None),
+                dependency("renamed-bake", Some("bake"), None, false, None),
+            ],
+        );
+
+        assert_eq!(
+            generated_imports(&package),
+            "// Generated by `cargo bake --regenerate`; do not edit.\n\nuse my_library as _;\nuse public_name as _;\nuse z_library as _;\n"
+        );
+    }
+
+    #[test]
+    fn writes_only_when_generated_contents_change() {
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("nested/generated.rs");
+
+        write_if_changed(&path, "generated\n").unwrap();
+        let modified = fs::metadata(&path).unwrap().modified().unwrap();
+        write_if_changed(&path, "generated\n").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "generated\n");
+        assert_eq!(fs::metadata(path).unwrap().modified().unwrap(), modified);
+    }
+
+    #[test]
+    fn reports_filesystem_write_failures() {
+        let directory = tempdir().unwrap();
+        let blocker = directory.path().join("blocker");
+        fs::write(&blocker, "file").unwrap();
+
+        assert!(write_if_changed(&blocker.join("nested/generated.rs"), "generated").is_err());
+
+        let directory_path = directory.path().join("directory");
+        fs::create_dir(&directory_path).unwrap();
+        assert!(write_if_changed(&directory_path, "generated").is_err());
+
+        assert!(write_if_changed(Path::new("/"), "generated").is_err());
+    }
+
+    #[test]
+    fn adds_migrates_and_validates_the_generated_module_declaration() {
+        let directory = tempdir().unwrap();
+        let source = directory.path().join("src/main.rs");
+        write(&source, "fn main() {}\n");
+        add_generated_module(&source).unwrap();
+        let generated = fs::read_to_string(&source).unwrap();
+        assert!(generated.contains("#[path = \"bake_generated_tasks/mod.rs\"]"));
+        add_generated_module(&source).unwrap();
+        assert_eq!(fs::read_to_string(&source).unwrap(), generated);
+
+        let manual_module = directory.path().join("manual.rs");
+        write(&manual_module, "mod bake_generated_tasks;\n");
+        assert!(add_generated_module(&manual_module).is_err());
+
+        let source_without_final_newline = directory.path().join("without-newline.rs");
+        write(&source_without_final_newline, "fn main() {} ");
+        add_generated_module(&source_without_final_newline).unwrap();
+        assert!(
+            fs::read_to_string(&source_without_final_newline)
+                .unwrap()
+                .contains("fn main() {} \n\n")
+        );
+
+        let legacy_source = directory.path().join("legacy/main.rs");
+        write(
+            &legacy_source,
+            "fn main() {}\n#[path = \"__bake_generated_tasks/mod.rs\"]\nmod __bake_generated_tasks;\n",
+        );
+        let legacy_module = legacy_source
+            .parent()
+            .unwrap()
+            .join("__bake_generated_tasks/mod.rs");
+        write(
+            &legacy_module,
+            "// Generated by `cargo bake --regenerate`; do not edit.\nuse dependency as _;\n",
+        );
+        add_generated_module(&legacy_source).unwrap();
+        assert!(
+            fs::read_to_string(&legacy_source)
+                .unwrap()
+                .contains("mod bake_generated_tasks;")
+        );
+        assert!(!legacy_module.exists());
+
+        let both_source = directory.path().join("both/main.rs");
+        write(
+            &both_source,
+            "#[path = \"bake_generated_tasks/mod.rs\"]\nmod bake_generated_tasks;\n#[path = \"__bake_generated_tasks/mod.rs\"]\nmod __bake_generated_tasks;\n",
+        );
+        add_generated_module(&both_source).unwrap();
+        assert!(
+            !fs::read_to_string(&both_source)
+                .unwrap()
+                .contains("__bake_generated_tasks")
+        );
+    }
+
+    #[test]
+    fn removes_only_marked_legacy_generated_modules() {
+        let directory = tempdir().unwrap();
+        let source = directory.path().join("src/main.rs");
+        write(&source, "fn main() {}\n");
+        let legacy_directory = source.parent().unwrap().join("__bake_generated_tasks");
+        write(
+            &legacy_directory.join("mod.rs"),
+            "// Generated by `cargo bake --regenerate`; do not edit.\n",
+        );
+        remove_legacy_generated_module(&source).unwrap();
+        assert!(!legacy_directory.exists());
+
+        write(&legacy_directory.join("mod.rs"), "project-owned source\n");
+        remove_legacy_generated_module(&source).unwrap();
+        assert!(legacy_directory.join("mod.rs").is_file());
+
+        write(
+            &legacy_directory.join("mod.rs"),
+            "// Generated by `cargo bake --regenerate`; do not edit.\n",
+        );
+        write(&legacy_directory.join("keep.rs"), "fn keep() {}\n");
+        remove_legacy_generated_module(&source).unwrap();
+        assert!(legacy_directory.join("keep.rs").is_file());
+
+        remove_legacy_generated_module(Path::new("/")).unwrap();
+    }
+
+    #[test]
+    fn bootstraps_workspace_member_and_standalone_task_packages() {
+        let directory = tempdir().unwrap();
+        let root = directory.path().join("project-name");
+        let workspace_manifest = root.join("Cargo.toml");
+        write(&workspace_manifest, "[workspace]\nmembers = []\n");
+        let location = Location {
+            root: root.canonicalize().unwrap(),
+            workspace_root: root.canonicalize().unwrap(),
+            workspace_manifest: workspace_manifest.clone(),
+            task_manifest: root.join("bake/Cargo.toml"),
+        };
+
+        bootstrap_task_package(&location).unwrap();
+        let manifest = fs::read_to_string(&location.task_manifest).unwrap();
+        assert!(manifest.contains("name = \"project-name-bake\""));
+        assert!(!manifest.contains("[workspace]"));
+        assert!(
+            fs::read_to_string(&workspace_manifest)
+                .unwrap()
+                .contains("\"bake\"")
+        );
+        let source = location.task_manifest.parent().unwrap().join("src/main.rs");
+        assert!(
+            fs::read_to_string(&source)
+                .unwrap()
+                .contains("Registry::discover")
+        );
+        fs::write(&source, "// keep project task source\n").unwrap();
+        bootstrap_task_package(&location).unwrap();
+        assert_eq!(
+            fs::read_to_string(&source).unwrap(),
+            "// keep project task source\n"
+        );
+
+        let standalone_root = directory.path().join("standalone");
+        let standalone_workspace = directory.path().join("workspace");
+        write(
+            &standalone_workspace.join("Cargo.toml"),
+            "[workspace]\nmembers = []\n",
+        );
+        let standalone = Location {
+            root: standalone_root.clone(),
+            workspace_root: standalone_workspace.clone(),
+            workspace_manifest: standalone_workspace.join("Cargo.toml"),
+            task_manifest: standalone_root.join("bake/Cargo.toml"),
+        };
+        bootstrap_task_package(&standalone).unwrap();
+        assert!(
+            fs::read_to_string(&standalone.task_manifest)
+                .unwrap()
+                .contains("[workspace]")
+        );
+    }
+
+    #[test]
+    fn reports_task_source_bootstrap_write_failures() {
+        let directory = tempdir().unwrap();
+        let root = directory.path().canonicalize().unwrap();
+        write(&root.join("Cargo.toml"), "[workspace]\nmembers = []\n");
+        let task_directory = root.join("tasks");
+        fs::create_dir_all(&task_directory).unwrap();
+        fs::write(task_directory.join("src"), "not a directory").unwrap();
+
+        let location = Location {
+            root: root.clone(),
+            workspace_root: root.clone(),
+            workspace_manifest: root.join("Cargo.toml"),
+            task_manifest: task_directory.join("Cargo.toml"),
+        };
+
+        assert!(bootstrap_task_package(&location).is_err());
+    }
+
+    #[test]
+    fn normalizes_generated_package_names() {
+        assert_eq!(package_name("Socketry-Rust"), "socketry-rust");
+        assert_eq!(package_name("many---separators"), "many-separators");
+        assert_eq!(
+            package_name("trailing-separators---"),
+            "trailing-separators"
+        );
+        assert_eq!(package_name("123-project"), "project-123-project");
+        assert_eq!(package_name("---"), "project");
+    }
+
+    #[test]
+    fn matches_workspace_member_globs() {
+        assert!(member_pattern_matches("crates/task", "crates/task"));
+        assert!(member_pattern_matches("**", "nested/crate"));
+        assert!(member_pattern_matches("**/*", "nested/crate"));
+        assert!(member_pattern_matches("*", "crate"));
+        assert!(!member_pattern_matches("*", "nested/crate"));
+        assert!(member_pattern_matches("crates/**", "crates/nested/task"));
+        assert!(member_pattern_matches("crates/*", "crates/task"));
+        assert!(!member_pattern_matches("crates/*", "crates/nested/task"));
+        assert!(member_pattern_matches("crates/task*", "crates/task-runner"));
+        assert!(!member_pattern_matches(
+            "crates/task*",
+            "crates/task/nested"
+        ));
+        assert!(!member_pattern_matches("other/*", "crates/task"));
+        assert!(!member_pattern_matches("plain", "different"));
+    }
+
+    #[test]
+    fn adds_workspace_members_without_overriding_patterns_or_exclusions() {
+        let directory = tempdir().unwrap();
+        let manifest = directory.path().join("Cargo.toml");
+
+        write(&manifest, "[package]\nname = \"root\"\n");
+        assert!(!add_workspace_member(&manifest, "bake").unwrap());
+        assert!(
+            fs::read_to_string(&manifest)
+                .unwrap()
+                .contains("members = [\"bake\"]")
+        );
+
+        write(
+            &manifest,
+            "[workspace]\nmembers = [\"tools/*\", 42]\nexclude = \"ignored\"\n",
+        );
+        let original = fs::read_to_string(&manifest).unwrap();
+        assert!(!add_workspace_member(&manifest, "tools/bake").unwrap());
+        assert_eq!(fs::read_to_string(&manifest).unwrap(), original);
+
+        write(&manifest, "[workspace]\nexclude = [\"tools/**\"]\n");
+        assert!(add_workspace_member(&manifest, "tools/bake").unwrap());
+
+        write(&manifest, "workspace = \"not a table\"\n");
+        assert!(add_workspace_member(&manifest, "bake").is_err());
+
+        write(&manifest, "[workspace]\nmembers = \"not an array\"\n");
+        assert!(add_workspace_member(&manifest, "bake").is_err());
+    }
+}

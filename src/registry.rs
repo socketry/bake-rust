@@ -3,6 +3,7 @@
 
 use crate::{Arguments, Context, Error, Format, Result, Task, output};
 use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsString;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -57,8 +58,12 @@ impl Registry {
     /// A dependency that contributes tasks must be referenced by the executable
     /// (for example, `use bake_releases as _;`) so the linker includes it.
     pub fn discover() -> Result<Self> {
+        Self::discover_from(&TASK_REGISTRATIONS)
+    }
+
+    fn discover_from(registrations: &[TaskRegistration]) -> Result<Self> {
         let mut registry = Self::new();
-        for registration in TASK_REGISTRATIONS {
+        for registration in registrations {
             if registration.builtin {
                 continue;
             }
@@ -224,17 +229,16 @@ impl Registry {
     pub fn run(self) -> Result<()> {
         let tokens: Vec<_> = std::env::args_os()
             .skip(1)
-            .map(|token| {
-                token
-                    .into_string()
-                    .map_err(|_| Error::new("task arguments must be UTF-8"))
-            })
+            .map(task_argument)
             .collect::<Result<_>>()?;
-        let root = std::env::var_os("BAKE_PROJECT_ROOT")
-            .map(PathBuf::from)
-            .map_or_else(std::env::current_dir, Ok)?;
-        let output = self.run_arguments(root, &tokens)?;
-        io::stdout().lock().write_all(output.as_bytes())?;
+        let root =
+            root_from_environment(std::env::var_os("BAKE_PROJECT_ROOT"), std::env::current_dir)?;
+        self.run_with(root, &tokens, &mut io::stdout().lock())
+    }
+
+    fn run_with(self, root: PathBuf, tokens: &[String], writer: &mut dyn Write) -> Result<()> {
+        let output = self.run_arguments(root, tokens)?;
+        writer.write_all(output.as_bytes())?;
         Ok(())
     }
 
@@ -242,6 +246,10 @@ impl Registry {
     /// type validation finish before any task starts. Tasks may write an output
     /// file or return captured output.
     pub fn run_arguments(self, root: impl Into<PathBuf>, tokens: &[String]) -> Result<String> {
+        self.run_arguments_from(root.into(), tokens)
+    }
+
+    fn run_arguments_from(self, root: PathBuf, tokens: &[String]) -> Result<String> {
         let (format, tokens) = if tokens.first().is_some_and(|token| token == "--json") {
             (Some(Format::Json), &tokens[1..])
         } else {
@@ -275,6 +283,16 @@ impl Registry {
     }
 }
 
+fn root_from_environment(
+    configured_root: Option<std::ffi::OsString>,
+    current_directory: fn() -> io::Result<PathBuf>,
+) -> Result<PathBuf> {
+    configured_root
+        .map(PathBuf::from)
+        .map_or_else(current_directory, Ok)
+        .map_err(Into::into)
+}
+
 fn namespace_from_module(task: &mut Task, module_path: &str) {
     if task.name.contains(':') {
         return;
@@ -296,6 +314,12 @@ impl Default for Registry {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn task_argument(token: OsString) -> Result<String> {
+    token
+        .into_string()
+        .map_err(|_| Error::new("task arguments must be UTF-8"))
 }
 
 fn validate_task(task: &Task) -> Result<()> {
@@ -323,4 +347,247 @@ fn validate_task(task: &Task) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn handler(_: &mut Context, _: &Arguments) -> Result<crate::Value> {
+        Ok(crate::Value::Null)
+    }
+
+    fn failing_handler(_: &mut Context, _: &Arguments) -> Result<crate::Value> {
+        Err(Error::new("output failure"))
+    }
+
+    fn invalid_task() -> Task {
+        task("invalid task name", vec![])
+    }
+
+    struct FailingWriter;
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+            Err(io::Error::other("writer failed"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn task(name: &str, parameters: Vec<crate::Parameter>) -> Task {
+        Task::new(name, "A test task.", parameters, handler)
+    }
+
+    fn inspection_task() -> Task {
+        task(
+            "inspect",
+            vec![
+                crate::Parameter::new::<String>("name").help("A person's name."),
+                crate::Parameter::new::<bool>("excited")
+                    .named()
+                    .default("false")
+                    .help("Add emphasis."),
+                crate::Parameter::new::<String>("label")
+                    .repeated()
+                    .help("Repeat this option."),
+            ],
+        )
+    }
+
+    #[test]
+    fn replacement_checks_names_and_marks_output_handlers() {
+        let mut registry = Registry::new();
+
+        assert!(registry.replace("output", task("wrong", vec![])).is_err());
+        assert!(registry.replace("invalid", invalid_task()).is_err());
+        assert!(
+            registry
+                .replace("missing", task("missing", vec![]))
+                .is_err()
+        );
+
+        registry.register(task("custom", vec![])).unwrap();
+        registry.replace("custom", task("custom", vec![])).unwrap();
+        registry.replace("output", task("output", vec![])).unwrap();
+
+        assert!(registry.tasks["output"].produces_output());
+        assert_eq!(
+            registry
+                .context(PathBuf::from("."))
+                .call("custom", &[])
+                .unwrap(),
+            crate::Value::Null
+        );
+    }
+
+    #[test]
+    fn default_registry_includes_builtins_and_rejects_invalid_metadata() {
+        let mut registry = Registry::default();
+        assert!(registry.tasks.contains_key("output"));
+        assert!(registry.tasks.contains_key("null"));
+
+        assert!(
+            registry
+                .include("invalid namespace", Registry::new())
+                .is_err()
+        );
+        let invalid_parameter = crate::Parameter::new::<String>("invalid-name");
+        assert!(
+            registry
+                .register(task("valid", vec![invalid_parameter]))
+                .is_err()
+        );
+
+        let duplicate_parameters = vec![
+            crate::Parameter::new::<String>("name"),
+            crate::Parameter::new::<String>("name"),
+        ];
+        assert!(
+            registry
+                .register(task("duplicate-parameters", duplicate_parameters))
+                .is_err()
+        );
+
+        registry.register(task("duplicate", vec![])).unwrap();
+        assert!(registry.register(task("duplicate", vec![])).is_err());
+    }
+
+    #[test]
+    fn discovers_tasks_and_includes_namespaces() {
+        let discovered = Registry::discover().unwrap();
+        assert!(discovered.tasks.contains_key("output"));
+        assert!(discovered.tasks.contains_key("null"));
+        assert!(discovered.tasks().count() >= 2);
+
+        let mut source = Registry::new();
+        source.register(task("inspect", vec![])).unwrap();
+        let mut registry = Registry::new();
+        registry.include("project", source).unwrap();
+        assert!(registry.tasks.contains_key("project:inspect"));
+
+        let mut unnamespaced = Registry::new();
+        unnamespaced.register(task("unqualified", vec![])).unwrap();
+        registry.include("", unnamespaced).unwrap();
+        assert!(registry.tasks.contains_key("unqualified"));
+
+        let mut duplicate = Registry::new();
+        duplicate.register(task("inspect", vec![])).unwrap();
+        assert!(registry.include("project", duplicate).is_err());
+    }
+
+    #[test]
+    fn run_prints_help_when_no_task_is_given() {
+        assert!(Registry::new().run().is_ok());
+    }
+
+    #[test]
+    fn runs_path_root_commands_and_reports_unknown_help_tasks() {
+        let mut registry = Registry::new();
+        registry.register(inspection_task()).unwrap();
+
+        let help = registry.help(Some("inspect")).unwrap();
+        assert!(help.contains("name: alloc::string::String (positional, required)"));
+        assert!(help.contains("--excited value: bool (named, optional, default: false)"));
+        assert!(
+            help.contains("--label value: alloc::string::String (named, optional, repeatable)")
+        );
+        assert!(help.contains("Repeat this option."));
+
+        assert_eq!(
+            registry
+                .run_arguments(
+                    PathBuf::from("."),
+                    &["--json".into(), "inspect".into(), "Sam".into()],
+                )
+                .unwrap(),
+            "null\n"
+        );
+
+        let mut invalid_arguments_registry = Registry::new();
+        invalid_arguments_registry
+            .register(inspection_task())
+            .unwrap();
+        assert!(
+            invalid_arguments_registry
+                .run_arguments(PathBuf::from("."), &["inspect".into()])
+                .unwrap_err()
+                .to_string()
+                .contains("inspect: missing argument \"name\"")
+        );
+
+        let mut help_registry = Registry::new();
+        help_registry.register(inspection_task()).unwrap();
+        assert_eq!(
+            help_registry
+                .run_arguments(PathBuf::from("."), &["inspect".into(), "--help".into()])
+                .unwrap(),
+            help
+        );
+        assert!(Registry::new().help(Some("missing")).is_err());
+    }
+
+    #[test]
+    fn adds_module_namespaces_without_overwriting_explicit_names() {
+        let mut unqualified = task("inspect", vec![]);
+        namespace_from_module(&mut unqualified, "crate::my_module::build_tasks");
+        assert_eq!(unqualified.name, "my-module:build-tasks:inspect");
+
+        let mut qualified = task("project:inspect", vec![]);
+        namespace_from_module(&mut qualified, "crate::other_module");
+        assert_eq!(qualified.name, "project:inspect");
+
+        let mut root = task("inspect", vec![]);
+        namespace_from_module(&mut root, "crate");
+        assert_eq!(root.name, "inspect");
+    }
+
+    #[test]
+    fn converts_process_arguments_and_rejects_non_utf8_values() {
+        assert_eq!(task_argument("inspect".into()).unwrap(), "inspect");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStringExt;
+
+            assert!(task_argument(OsString::from_vec(vec![0xff])).is_err());
+        }
+    }
+
+    #[test]
+    fn propagates_discovery_output_and_writer_errors() {
+        static INVALID_REGISTRATIONS: [TaskRegistration; 1] = [TaskRegistration {
+            factory: invalid_task,
+            module_path: "tests",
+            builtin: false,
+        }];
+        assert!(Registry::discover_from(&INVALID_REGISTRATIONS).is_err());
+
+        let mut registry = Registry::new();
+        registry.register(task("inspect", vec![])).unwrap();
+        registry
+            .replace(
+                "output",
+                Task::new("output", "Fail.", vec![], failing_handler),
+            )
+            .unwrap();
+        assert!(registry.run_arguments(".", &["inspect".into()]).is_err());
+
+        let mut failing_writer = FailingWriter;
+        assert!(
+            Registry::new()
+                .run_with(PathBuf::from("."), &[], &mut failing_writer)
+                .is_err()
+        );
+        assert!(failing_writer.flush().is_ok());
+        assert!(
+            root_from_environment(None, || Err(io::Error::other("no current directory"))).is_err()
+        );
+        assert_eq!(
+            root_from_environment(Some("project".into()), std::env::current_dir).unwrap(),
+            PathBuf::from("project")
+        );
+    }
 }

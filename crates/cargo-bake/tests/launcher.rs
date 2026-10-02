@@ -203,6 +203,34 @@ fn child_exit_code_is_preserved() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn maps_a_signaled_cargo_process_to_a_shell_exit_code() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let project = project("bake", "");
+    let fake_cargo = project.path().join("fake-cargo");
+    write(
+        project.path(),
+        "fake-cargo",
+        "#!/bin/sh\nif [ \"$1\" = metadata ]; then exec \"$REAL_CARGO\" \"$@\"; fi\nkill -TERM $$\n",
+    );
+    fs::set_permissions(&fake_cargo, fs::Permissions::from_mode(0o755)).unwrap();
+    let real_cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-bake"))
+        .args(["--offline"])
+        .current_dir(project.path())
+        .env_remove("CARGO_TARGET_DIR")
+        .env("CARGO_NET_OFFLINE", "true")
+        .env("CARGO", &fake_cargo)
+        .env("REAL_CARGO", real_cargo)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(128 + 15));
+}
+
 #[test]
 fn help_and_version_work_without_a_project() {
     let directory = tempfile::tempdir().unwrap();
@@ -213,6 +241,18 @@ fn help_and_version_work_without_a_project() {
         !launch(directory.path(), &["--manifest-path"])
             .status
             .success()
+    );
+}
+
+#[test]
+fn regenerate_rejects_task_arguments() {
+    let project = project("bake", "");
+    let output = launch(project.path(), &["--regenerate", "greet"]);
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("--regenerate cannot be combined with task arguments")
     );
 }
 
@@ -251,6 +291,118 @@ fn malformed_metadata_is_reported() {
 }
 
 #[test]
+fn regeneration_reports_an_invalid_package_workspace_path() {
+    let project = project("bake", "");
+    write(
+        project.path(),
+        "application/Cargo.toml",
+        "[package]\nname = \"application\"\nversion = \"0.0.0\"\nedition = \"2024\"\nworkspace = \"../missing\"\n",
+    );
+
+    let output = launch(
+        project.path(),
+        &["--manifest-path", "application/Cargo.toml", "--regenerate"],
+    );
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("os error 2"), "unexpected error: {stderr}");
+}
+
+#[cfg(unix)]
+#[test]
+fn regeneration_uses_manifest_metadata_when_cargo_metadata_fails() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let project = project(
+        "bake",
+        "[workspace.metadata.bake]\nmanifest = \"bake/Cargo.toml\"",
+    );
+    let fake_cargo = project.path().join("fake-cargo");
+    write(project.path(), "fake-cargo", "#!/bin/sh\nexit 1\n");
+    let mut permissions = fs::metadata(&fake_cargo).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&fake_cargo, permissions).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-bake"))
+        .args(["--manifest-path", "application/Cargo.toml", "--offline"])
+        .current_dir(project.path())
+        .env_remove("CARGO_TARGET_DIR")
+        .env("CARGO_NET_OFFLINE", "true")
+        .env("CARGO", &fake_cargo)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("cargo metadata failed"));
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-bake"))
+        .args(["--manifest-path", "application/Cargo.toml", "--regenerate"])
+        .current_dir(project.path())
+        .env_remove("CARGO_TARGET_DIR")
+        .env("CARGO_NET_OFFLINE", "true")
+        .env("CARGO", fake_cargo)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("cargo metadata failed"));
+}
+
+#[test]
+fn regeneration_respects_workspace_member_globs() {
+    let bake_root = bake_source_root();
+
+    for pattern in ["tools/*", "tools/bake*"] {
+        let directory = tempfile::tempdir().unwrap();
+        write(
+            directory.path(),
+            "Cargo.toml",
+            &format!(
+                "[workspace]\nmembers = [\"application\", {pattern:?}]\nresolver = \"3\"\n\n[workspace.metadata.bake]\nmanifest = \"tools/bake/Cargo.toml\"\n\n[patch.crates-io]\nbake = {{ path = {bake_root:?} }}\n"
+            ),
+        );
+        write(
+            directory.path(),
+            "application/Cargo.toml",
+            "[package]\nname = \"application\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        );
+        write(
+            directory.path(),
+            "application/src/lib.rs",
+            "pub fn application() {}\n",
+        );
+
+        success(launch(directory.path(), &["--regenerate"]));
+        assert!(directory.path().join("tools/bake/Cargo.toml").is_file());
+    }
+}
+
+#[test]
+fn regeneration_creates_a_standalone_task_package_when_excluded() {
+    for (pattern, task_manifest) in [
+        ("tools/**", "tools/bake/Cargo.toml"),
+        ("*", "bake/Cargo.toml"),
+        ("**", "bake/Cargo.toml"),
+        ("**/*", "bake/Cargo.toml"),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        write(
+            directory.path(),
+            "Cargo.toml",
+            &format!(
+                "[workspace]\nmembers = []\nexclude = [{pattern:?}]\nresolver = \"3\"\n\n[workspace.metadata.bake]\nmanifest = {task_manifest:?}\n"
+            ),
+        );
+
+        success(launch(directory.path(), &["--regenerate"]));
+
+        let task_manifest = fs::read_to_string(directory.path().join(task_manifest)).unwrap();
+        assert!(task_manifest.contains("\n[workspace]\n"));
+    }
+}
+
+#[test]
 fn regenerate_bootstraps_the_task_crate_and_refreshes_dependency_links() {
     let directory = tempfile::tempdir().unwrap();
     let bake_root = bake_source_root();
@@ -258,7 +410,7 @@ fn regenerate_bootstraps_the_task_crate_and_refreshes_dependency_links() {
         directory.path(),
         "Cargo.toml",
         &format!(
-            "[workspace]\nmembers = [\"bake\", \"task-provider\"]\nresolver = \"3\"\n\n[patch.crates-io]\nbake = {{ path = {:?} }}\n",
+            "[workspace]\nmembers = [\"task-provider\"]\nresolver = \"3\"\n\n[patch.crates-io]\nbake = {{ path = {:?} }}\n",
             bake_root.to_string_lossy()
         ),
     );
@@ -281,7 +433,7 @@ fn regenerate_bootstraps_the_task_crate_and_refreshes_dependency_links() {
     assert!(
         fs::read_to_string(directory.path().join("Cargo.toml"))
             .unwrap()
-            .contains("members = [\"bake\", \"task-provider\"]")
+            .contains("members = [\"task-provider\", \"bake\"]")
     );
 
     write(

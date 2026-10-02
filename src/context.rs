@@ -117,3 +117,62 @@ impl Context {
         Ok(result)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::Invocation;
+    use crate::{Arguments, Task};
+
+    fn value_task(_: &mut Context, _: &Arguments) -> Result<Value> {
+        Ok(Value::Null)
+    }
+
+    #[test]
+    fn exposes_root_previous_output_and_typed_state() {
+        let mut context = Registry::new().context("project");
+        assert_eq!(context.root(), Path::new("project"));
+        assert_eq!(context.previous(), &Value::Null);
+        context.set_default_format(Some(Format::Json));
+        assert_eq!(context.default_format(), Some(Format::Json));
+        assert!(context.get::<usize>().is_none());
+        assert!(context.get_mut::<usize>().is_none());
+
+        context.insert(40usize);
+        assert_eq!(context.get::<usize>(), Some(&40));
+        *context.get_mut::<usize>().unwrap() += 2;
+        assert_eq!(context.get::<usize>(), Some(&42));
+        assert!(context.get::<String>().is_none());
+
+        context.write_output("hello");
+        assert_eq!(context.take_output(), "hello");
+        assert_eq!(context.take_output(), "");
+    }
+
+    #[test]
+    fn reports_invalid_and_unknown_task_calls() {
+        let mut registry = Registry::new();
+        registry
+            .register(Task::new("value", "Return null.", Vec::new(), value_task))
+            .unwrap();
+        let mut context = registry.context(".");
+
+        assert_eq!(context.call("value", &[]).unwrap(), Value::Null);
+        assert!(context.call("missing", &[]).is_err());
+        assert!(context.call("value", &["::", "value"]).is_err());
+        assert!(
+            context
+                .call_if_registered("missing", &[])
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            context
+                .invoke(Invocation {
+                    name: "missing".to_owned(),
+                    arguments: Arguments::default(),
+                })
+                .is_err()
+        );
+    }
+}

@@ -12,35 +12,40 @@ jobs:
   test:
     name: ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, macos-latest, windows-latest]
+        runner: [macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install the Cargo launcher
-        run: cargo install --path crates/cargo-bake --locked
-      - name: Run workspace and documentation tests
-        run: cargo test --workspace --locked
-      - name: Exercise project task discovery
-        run: cargo bake --locked --list
-      - name: Exercise typed tasks and release library
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - name: Install Bake launcher
+        run: cargo install socketry-cargo-bake --locked
+      - name: Run workspace tests
+        run: cargo bake --locked test
+      - name: Exercise task discovery and invocation
         run: |
+          cargo bake --locked --list
           cargo bake --locked greet Samuel --excited true
           cargo bake --locked greet Samuel output --format json
           cargo bake --locked add 20 22 :: result
           cargo bake --locked greet Samuel :: null
           cargo bake --locked releases:notes v0.1.0
 
-  quality:
+  coverage:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
-          components: rustfmt, clippy
-      - run: cargo fmt --all --check
+          components: clippy, llvm-tools-preview, rustfmt
+      - name: Install Bake launcher
+        run: cargo install socketry-cargo-bake --locked
+      - name: Install coverage tool
+        run: cargo install cargo-llvm-cov --locked
+      - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Run tests and require complete line coverage
+        run: cargo bake --locked test:coverage --all-targets true

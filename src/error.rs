@@ -38,3 +38,18 @@ impl From<serde_json::Error> for Error {
 }
 
 pub type Result<Output = ()> = std::result::Result<Output, Error>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn converts_io_and_json_errors() {
+        let io_error = Error::from(std::io::Error::other("file unavailable"));
+        assert_eq!(io_error.to_string(), "file unavailable");
+
+        let json_error = serde_json::from_str::<serde_json::Value>("{").unwrap_err();
+        let error = Error::from(json_error);
+        assert!(error.to_string().contains("EOF while parsing"));
+    }
+}

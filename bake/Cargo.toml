@@ -5,10 +5,13 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-socketry-project = "0.2"
+socketry-project = "0.3"
 bake = { version = "0.17.2", path = ".." }
-bake-agent-context = { version = "0.1.1" }
-bake-test-rust = { version = "0.1.2" }
+bake-agent-context = { version = "0.2" }
+bake-test-rust = { version = "0.2" }
 bake-releases = { version = "0.2.1" }
 bake-cargo = { version = "0.2.4" }
 bake-license = { version = "0.1.1" }
+
+[dev-dependencies]
+tempfile.workspace = true

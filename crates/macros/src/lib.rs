@@ -11,9 +11,16 @@ use syn::{Attribute, Expr, FnArg, ItemFn, LitStr, Pat, Path, Type, parse_macro_i
 #[proc_macro_attribute]
 pub fn task(attributes: TokenStream, input: TokenStream) -> TokenStream {
     let function = parse_macro_input!(input as ItemFn);
-    match expand(attributes.into(), function) {
-        Ok(output) => output.into(),
-        Err(error) => error.into_compile_error().into(),
+    expand_or_compile_error(attributes.into(), function).into()
+}
+
+fn expand_or_compile_error(
+    attributes: proc_macro2::TokenStream,
+    function: ItemFn,
+) -> proc_macro2::TokenStream {
+    match expand(attributes, function) {
+        Ok(output) => output,
+        Err(error) => error.into_compile_error(),
     }
 }
 

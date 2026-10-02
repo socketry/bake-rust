@@ -118,3 +118,46 @@ pub fn null(#[bake(input)] input: Value) -> Result<Value> {
 pub(crate) fn builtins() -> Vec<crate::Task> {
     vec![output_task().builtin(), null_task().builtin()]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn formats_have_stable_names() {
+        assert_eq!(Format::Raw.to_string(), "raw");
+        assert_eq!(Format::Json.to_string(), "json");
+        assert_eq!(Format::Ndjson.to_string(), "ndjson");
+        assert_eq!("raw".parse::<Format>().unwrap(), Format::Raw);
+        assert_eq!("json".parse::<Format>().unwrap(), Format::Json);
+        assert_eq!("ndjson".parse::<Format>().unwrap(), Format::Ndjson);
+        assert!("yaml".parse::<Format>().is_err());
+    }
+
+    #[test]
+    fn unknown_file_extensions_do_not_select_a_format() {
+        assert_eq!(inferred_format(Path::new("releases.md")), None);
+        assert_eq!(inferred_format(Path::new("notes.csv")), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_file_extensions_do_not_select_a_format() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let path = PathBuf::from(std::ffi::OsString::from_vec(vec![
+            b'n', b'o', b't', b'e', b'.', 0xff,
+        ]));
+        assert_eq!(inferred_format(&path), None);
+    }
+
+    #[test]
+    fn reports_output_file_write_errors() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("directory");
+        fs::create_dir(&destination).unwrap();
+        let mut context = crate::Registry::new().context(directory.path());
+
+        assert!(output(&mut context, Value::Null, Some(destination), None).is_err());
+    }
+}
