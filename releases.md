@@ -1,5 +1,13 @@
 # Releases
 
+## Unreleased
+
+
+## v0.17.4
+
+- Use the shared `socketry-project` Releasing skill for the standard release
+  process and remove references to the duplicate Bake Cargo publishing context.
+
 ## v0.17.3
 
 - Align the Readme's contribution guidance with Bake Readme conventions.
