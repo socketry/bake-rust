@@ -281,13 +281,19 @@ start a runtime or a subprocess; Bake imposes no async runtime dependency.
 Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`,
 or `bump --version X.Y.Z`), then run `cargo bake cargo:release` and open a
 pull request. After review and merge, GitHub Actions publishes the release
-when the configured `crates-io` environment approves it. See the
-[Cargo publishing guide](https://github.com/socketry/bake-cargo-rust/blob/main/context/publishing.md).
+when the configured `crates-io` environment approves it. Follow the shared
+[Releasing skill](https://github.com/socketry/socketry-project-rust/blob/main/context/releasing.md)
+for the standard process.
 
 ## Releases
 
 <!-- bake-readme:releases:start -->
 See [releases.md](releases.md) for the full release history.
+
+### v0.17.4
+
+- Use the shared `socketry-project` Releasing skill for the standard release
+  process and remove references to the duplicate Bake Cargo publishing context.
 
 ### v0.17.3
 
@@ -301,11 +307,6 @@ See [releases.md](releases.md) for the full release history.
 - Add `cargo bake --regenerate` to create and synchronize a project's private task crate.
 - Integrate project release, license, agent-context, Readme, and external-test tasks.
 - Add external tests for six downstream Socketry projects.
-
-### v0.17.1
-
-- Create or update GitHub Releases after successful crates.io publication.
-- Resolve the local task crate during version updates.
 <!-- bake-readme:releases:end -->
 
 ## Contributing

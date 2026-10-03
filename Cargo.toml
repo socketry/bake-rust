@@ -3,7 +3,7 @@ members = ["crates/macros", "crates/cargo-bake", "bake"]
 resolver = "3"
 
 [workspace.package]
-version = "0.17.3"
+version = "0.17.4"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/socketry/bake-rust"
@@ -65,7 +65,7 @@ name = "bake"
 serde.workspace = true
 serde_json.workspace = true
 linkme.workspace = true
-bake-macros = { version = "0.17.3", path = "crates/macros" }
+bake-macros = { version = "0.17.4", path = "crates/macros" }
 
 [dev-dependencies]
 tempfile.workspace = true

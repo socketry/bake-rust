@@ -97,7 +97,7 @@ Follow the current session's instructions about adding or running tests. Use
 Inspect actual workflow results before claiming verification on another
 platform.
 
-For release preparation and registry setup, see the shared
-[Cargo publishing guide](https://github.com/socketry/bake-cargo-rust/blob/main/context/publishing.md).
+For release preparation and registry setup, follow the shared
+[Releasing skill](https://github.com/socketry/socketry-project-rust/blob/main/context/releasing.md).
 Publishing must be explicitly requested; ordinary development commands do not
 release anything.

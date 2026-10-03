@@ -55,10 +55,9 @@ Agent Context is a language-agnostic specification for providing and consuming c
 
 Cargo project and release automation tasks for Bake
 
-#### [Cargo Publishing](.agents/context/bake-cargo/publishing.md)
+#### [Releasing](.agents/skills/socketry-project-releasing/SKILL.md)
 
-Use bake-cargo to prepare and publish Cargo projects through reviewed GitHub
-Actions releases.
+Follow the shared release process for Socketry Rust projects.
 
 ### bake-readme
 
