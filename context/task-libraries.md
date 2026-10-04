@@ -206,6 +206,11 @@ The attribute generates argument conversion, a descriptor, and registration.
 The library depends on `bake` to use these facilities. No additional registration
 framework or common task-library trait is needed.
 
+Reusable task libraries should declare `bake = "0"` so Cargo can resolve their
+registry dependency to the Bake 0.x version selected by the consuming task
+binary. Project-local task binaries can select a specific minor release, such
+as `bake = "0.18"`.
+
 Names are resolved during compilation from the defining `module_path!()`, the
 attribute, and Cargo's binary-target metadata. The generated `notes_task()`
 descriptor already contains `releases:notes`; registering it manually produces
@@ -247,7 +252,7 @@ Add a reusable task library as a dependency of the local task binary, then run
 
 ```toml
 [dependencies]
-bake = "0.17"
+bake = "0.18"
 socketry_executor = { package = "socketry-executor", version = "0.1" }
 bake_agent_context = "0.1"
 ```

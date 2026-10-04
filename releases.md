@@ -7,6 +7,8 @@
   names, project binary names, and matching module prefixes. Existing unnamed
   library tasks outside those prefixes gain a namespace; use explicit names to
   retain their previous commands.
+- Use `bake = "0"` for reusable task libraries so linked crates resolve one
+  Bake 0.x version and share its task registry.
 - Resolve task names at compile time. Generated descriptors now include their
   full namespaces, making manual registration and automatic discovery agree.
   Manual registries that added those namespaces with `Registry::include` should

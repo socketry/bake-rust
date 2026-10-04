@@ -429,9 +429,9 @@ fn regenerate_bootstraps_the_task_crate_and_refreshes_dependency_links() {
     );
 
     success(launch(directory.path(), &["--regenerate"]));
-    let task_manifest = directory.path().join("bake/Cargo.toml");
+    let task_manifest_path = directory.path().join("bake/Cargo.toml");
     let bootstrap_source = directory.path().join("bake/src/main.rs");
-    assert!(task_manifest.is_file());
+    assert!(task_manifest_path.is_file());
     assert!(bootstrap_source.is_file());
     assert!(
         fs::read_to_string(directory.path().join("Cargo.toml"))
@@ -439,11 +439,18 @@ fn regenerate_bootstraps_the_task_crate_and_refreshes_dependency_links() {
             .contains("members = [\"task-provider\", \"bake\"]")
     );
 
-    write(
-        directory.path(),
-        "bake/Cargo.toml",
-        "[package]\nname = \"project-bake\"\nversion = \"0.0.0\"\nedition = \"2024\"\npublish = false\ndefault-run = \"tasks\"\n\n[dependencies]\nbake = \"0.17.0\"\ntask-provider = { path = \"../task-provider\" }\n",
+    let bake_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap()
+        .to_string_lossy()
+        .replace('\\', "/");
+    let task_manifest_contents = format!(
+        "[package]\nname = \"project-bake\"\nversion = \"0.0.0\"\nedition = \"2024\"\npublish = false\ndefault-run = \"tasks\"\n\n[dependencies]\nbake = {{ version = \"{}\", path = \"{}\" }}\ntask-provider = {{ path = \"../task-provider\" }}\n",
+        env!("CARGO_PKG_VERSION"),
+        bake_path,
     );
+    write(directory.path(), "bake/Cargo.toml", &task_manifest_contents);
     write(directory.path(), "bake/src/main.rs", "fn main() {}\n");
     let task_source = directory.path().join("bake/src/bin/tasks.rs");
     write(
@@ -476,7 +483,7 @@ fn regenerate_bootstraps_the_task_crate_and_refreshes_dependency_links() {
 
     let output = Command::new("cargo")
         .args(["check", "--offline", "--manifest-path"])
-        .arg(&task_manifest)
+        .arg(&task_manifest_path)
         .current_dir(directory.path())
         .env("CARGO_NET_OFFLINE", "true")
         .env_remove("CARGO_TARGET_DIR")
