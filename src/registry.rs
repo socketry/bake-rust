@@ -22,7 +22,6 @@ pub(crate) struct Invocation {
 #[doc(hidden)]
 pub struct TaskRegistration {
     pub factory: fn() -> Task,
-    pub module_path: &'static str,
     pub builtin: bool,
 }
 
@@ -54,6 +53,10 @@ impl Registry {
 
     /// Discover task functions registered by `#[bake::task]` in this executable
     /// and its linked dependencies. Nested Rust modules become task namespaces.
+    /// Library crates named `bake_*` also supply a default namespace, with the
+    /// prefix removed and remaining underscores replaced by colons.
+    /// Names are resolved at compile time in the generated descriptors, so
+    /// manual registration uses the same names as discovery.
     ///
     /// A dependency that contributes tasks must be referenced by the executable
     /// (for example, `use bake_releases as _;`) so the linker includes it.
@@ -67,9 +70,7 @@ impl Registry {
             if registration.builtin {
                 continue;
             }
-            let mut task = (registration.factory)();
-            namespace_from_module(&mut task, registration.module_path);
-            registry.register(task)?;
+            registry.register((registration.factory)())?;
         }
         Ok(registry)
     }
@@ -293,23 +294,6 @@ fn root_from_environment(
         .map_err(Into::into)
 }
 
-fn namespace_from_module(task: &mut Task, module_path: &str) {
-    if task.name.contains(':') {
-        return;
-    }
-
-    let namespace = module_path
-        .split("::")
-        .skip(1)
-        .map(|component| component.replace('_', "-"))
-        .collect::<Vec<_>>()
-        .join(":");
-
-    if !namespace.is_empty() {
-        task.name = format!("{namespace}:{}", task.name);
-    }
-}
-
 impl Default for Registry {
     fn default() -> Self {
         Self::new()
@@ -530,21 +514,6 @@ mod tests {
     }
 
     #[test]
-    fn adds_module_namespaces_without_overwriting_explicit_names() {
-        let mut unqualified = task("inspect", vec![]);
-        namespace_from_module(&mut unqualified, "crate::my_module::build_tasks");
-        assert_eq!(unqualified.name, "my-module:build-tasks:inspect");
-
-        let mut qualified = task("project:inspect", vec![]);
-        namespace_from_module(&mut qualified, "crate::other_module");
-        assert_eq!(qualified.name, "project:inspect");
-
-        let mut root = task("inspect", vec![]);
-        namespace_from_module(&mut root, "crate");
-        assert_eq!(root.name, "inspect");
-    }
-
-    #[test]
     fn converts_process_arguments_and_rejects_non_utf8_values() {
         assert_eq!(task_argument("inspect".into()).unwrap(), "inspect");
 
@@ -560,10 +529,26 @@ mod tests {
     fn propagates_discovery_output_and_writer_errors() {
         static INVALID_REGISTRATIONS: [TaskRegistration; 1] = [TaskRegistration {
             factory: invalid_task,
-            module_path: "tests",
             builtin: false,
         }];
         assert!(Registry::discover_from(&INVALID_REGISTRATIONS).is_err());
+        let duplicate_registrations = [
+            TaskRegistration {
+                factory: inspection_task,
+                builtin: false,
+            },
+            TaskRegistration {
+                factory: inspection_task,
+                builtin: false,
+            },
+        ];
+        assert!(
+            Registry::discover_from(&duplicate_registrations)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("duplicate task")
+        );
 
         let mut registry = Registry::new();
         registry.register(task("inspect", vec![])).unwrap();

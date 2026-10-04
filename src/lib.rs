@@ -4,8 +4,9 @@
 //! Composable development tasks with typed arguments and shared context.
 //!
 //! Task attributes generate a sibling `function_task()` descriptor while
-//! preserving the original function for ordinary Rust calls. Register those
-//! descriptors explicitly and call [`Registry::run`] from your task binary.
+//! preserving the original function for ordinary Rust calls. Descriptors contain
+//! their compile-time command names. Collect them with [`Registry::discover`]
+//! or register them explicitly, then call [`Registry::run`] from your task binary.
 extern crate self as bake;
 
 mod arguments;
@@ -14,10 +15,12 @@ mod error;
 mod output;
 mod registry;
 mod task;
+mod task_name;
 
 #[doc(hidden)]
 pub mod __private {
     pub use crate::registry::{TASK_REGISTRATIONS, TaskRegistration};
+    pub use crate::task_name::TaskName;
     pub use linkme;
 }
 

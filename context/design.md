@@ -22,9 +22,15 @@ traits, output serialization, and the original function body.
 
 Each task macro adds a descriptor to a linkme distributed slice. The executable
 uses `Registry::discover()` to collect tasks from itself and linked dependencies.
-Nested Rust modules determine task namespaces, while explicit task names can
-override them. Exported task libraries should use fully qualified command names
-where needed to keep those names independent of Rust implementation modules.
+Unnamed tasks in library crates named `bake_*` derive a prefix from the crate
+name, removing `bake_` and replacing remaining underscores with colons. Nested
+modules extend the namespace; an existing matching module prefix is included
+only once. Project binaries and explicit names retain module-based naming,
+and a fully qualified explicit name bypasses inference.
+The macro emits constant-evaluated name construction from `module_path!()` and
+the task attributes. Generated descriptors contain their final names, so manual
+registration and discovery agree. Discovery validates metadata and detects
+duplicate names across the linked libraries.
 Follow [Structuring Bake Tasks in Crates](task-libraries.md) for semantic APIs,
 task adapters, and compatibility conventions. Rust omits unused dependencies
 from the final link, so each task library must be referenced by the executable

@@ -8,14 +8,17 @@ repository. It complements the public usage guides in this directory.
 Bake is a Cargo-compatible task runner inspired by Samuel Williams's Ruby Bake.
 The project-local task binary contains ordinary typed Rust functions. The launcher
 discovers and runs that binary through Cargo. `#[bake::task]` registers functions
-for `Registry::discover()`. Nested Rust modules define namespaces; task library
-dependencies must be referenced by the executable to make the linker include them.
+for `Registry::discover()`. Library crates named `bake_*` supply default task
+prefixes, extended by nested Rust modules. Project binaries keep module-based
+naming. Task library dependencies must be referenced by the executable to make
+the linker include them.
 
 ## Source map
 
 - src/arguments.rs: parameter metadata, typed validation, command-line parsing.
 - src/task.rs: task descriptor and handler interface.
-- src/registry.rs: registration, namespaces, command planning, help and output.
+- src/task_name.rs: constant-evaluated crate and module namespace inference.
+- src/registry.rs: registration, namespace imports, command planning, help and output.
 - src/output.rs: replaceable default output, raw/JSON/NDJSON formatting, and null sink.
 - src/context.rs: shared state, project root, previous result, nested calls.
 - crates/macros/: task attribute and generated adapters; re-exported by bake.
@@ -39,6 +42,8 @@ registered tasks are linked into the binary.
 - Task registration uses linkme's linker inventory. It is static, not a dynamic
   plugin ABI. Dependencies that contribute tasks must be referenced in the task
   binary, e.g. `use bake_releases as _;`.
+- The macro resolves names through Rust constant evaluation. Generated descriptors
+  have their final names before discovery; the registry validates and collects them.
 - The launcher reads Cargo metadata format 1; it does not link Cargo internals.
 - Package-level configuration takes precedence over workspace-level configuration.
 - The core is synchronous. An async runtime can be owned by an individual task.

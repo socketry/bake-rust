@@ -90,9 +90,12 @@ fn main() -> Result<()> {
 the arguments and adapts command-line input to the original function. It also adds
 the descriptor to Bake's link-time registration table. `Registry::discover()`
 collects tasks from the executable and linked task libraries. Nested Rust modules
-form namespaces by default; a fully qualified name such as
-`#[bake::task(name = "releases:notes")]` keeps the command independent of the
-function's module path.
+form namespaces by default. Library crate names beginning with `bake_` supply
+a prefix too: `bake_releases::notes` registers as `releases:notes`. A fully
+qualified name such as `#[bake::task(name = "releases:notes")]` overrides
+inference. Project binary targets keep their existing module-based names.
+Names are resolved at compile time, so generated descriptors contain the same
+final names whether registered manually or collected by `Registry::discover()`.
 
 ## Arguments and results
 
@@ -180,12 +183,12 @@ the new workspace version. A project can define that task in its private
 
 Give the library a semantic Rust API, then expose its operations with the task
 attribute. Small adapters can resolve project-relative paths and translate
-command arguments. For example, a library with a `read_notes` operation could
-expose a task directly from its crate root:
+command arguments. For example, a `bake_releases` library with a `read_notes`
+operation could expose a task directly from its crate root:
 
 ```rust,ignore
 // src/lib.rs
-#[bake::task(name = "releases:notes")]
+#[bake::task]
 pub fn notes(
     context: &mut bake::Context,
     version: String,
@@ -196,11 +199,19 @@ pub fn notes(
 ```
 
 Keep the main Rust API accessible at the crate root, with modules for meaningful
-domain concepts. In a `bake_releases` library, this function would be called as
-`bake_releases::notes` in Rust and `releases:notes` through Bake. The explicit
-task name supplies the command namespace, so no public `releases` wrapper
-module is needed. An operation whose signature already suits Bake can be
-annotated directly.
+domain concepts. This function would be called as `bake_releases::notes` in
+Rust and `releases:notes` through Bake. Bake removes the leading `bake_` and
+converts remaining crate-name underscores to colons, so `bake_agent_context`
+supplies `agent:context`. Nested modules extend that namespace, with module-name
+underscores converted to hyphens. A matching namespace already expressed by
+wrapper modules is included only once. An operation whose signature already
+suits Bake can be annotated directly.
+
+Explicit names retain their existing behavior: `name = "namespace:task"`
+specifies the entire name, while a short name uses only the defining module's
+namespace. This lets libraries preserve names such as a root `test` command.
+See the [migration guidance](context/task-libraries.md#align-an-existing-library)
+for existing library tasks whose default names gain a crate prefix.
 
 Add the library as a Cargo dependency and reference it from the task binary so
 Rust includes its registration entries in the link:

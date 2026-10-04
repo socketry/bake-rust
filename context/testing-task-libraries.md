@@ -57,6 +57,10 @@ errors. Select representative cases for each adapter; keep the full domain
 case matrix with the operation tests. Bake itself owns exhaustive tests of its
 generic argument parser and formatter.
 
+If a library exposes generated descriptors for manual registration, check that
+their names and invocation behavior agree with automatic discovery. Descriptors
+already contain the complete name resolved during compilation.
+
 For hooks, use a fresh `Registry` and context state to record calls and their
 arguments. Assert invocation order, optional-hook absence, and error propagation
 where these are part of the contract. Register or replace small recording

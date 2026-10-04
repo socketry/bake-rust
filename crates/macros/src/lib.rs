@@ -133,6 +133,7 @@ fn expand(
             .trim_start_matches("r#")
             .to_uppercase()
     );
+    let infer_crate_namespace = name.is_none();
     let command_name = name.unwrap_or_else(|| {
         LitStr::new(
             function_name.to_string().trim_start_matches("r#"),
@@ -166,6 +167,7 @@ fn expand(
         format_ident!("__bake_context", span = proc_macro2::Span::mixed_site());
     let invocation_arguments =
         format_ident!("__bake_arguments", span = proc_macro2::Span::mixed_site());
+    let resolved_name = format_ident!("__BAKE_TASK_NAME", span = proc_macro2::Span::mixed_site());
     let mut has_context = false;
     let mut has_input = false;
     for input in &mut function.sig.inputs {
@@ -283,7 +285,7 @@ fn expand(
         call_arguments.push(quote!(#identifier));
     }
     let task = quote! {
-            #runtime::Task::new(#command_name, #documentation, vec![#(#parameters),*], |#invocation_context, #invocation_arguments| {
+            #runtime::Task::new(#resolved_name, #documentation, vec![#(#parameters),*], |#invocation_context, #invocation_arguments| {
                 #(#bindings)*
                 let output = #function_name(#(#call_arguments),*).map_err(|error| #runtime::Error::new(error.to_string()))?;
                 #runtime::value(output)
@@ -301,6 +303,20 @@ fn expand(
         #(#conditional_attributes)*
         #[doc = "Generated Bake task descriptor."]
         #visibility fn #descriptor_name() -> #runtime::Task {
+            const #resolved_name: &str = if #builtin {
+                #command_name
+            } else {
+                const STORAGE: #runtime::__private::TaskName<{ module_path!().len() + #command_name.len() + 1 }> =
+                    #runtime::__private::TaskName::new(
+                        #command_name,
+                        module_path!(),
+                        #infer_crate_namespace && option_env!("CARGO_BIN_NAME").is_none(),
+                    );
+                match ::core::str::from_utf8(STORAGE.as_bytes()) {
+                    Ok(name) => name,
+                    Err(_) => panic!("task name must remain valid UTF-8"),
+                }
+            };
             #task
         }
 
@@ -311,7 +327,6 @@ fn expand(
         static #registration_name: #runtime::__private::TaskRegistration =
             #runtime::__private::TaskRegistration {
                 factory: #descriptor_name,
-                module_path: module_path!(),
                 builtin: #builtin,
             };
     })
