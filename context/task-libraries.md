@@ -326,8 +326,10 @@ Review unnamed tasks in `bake_*` libraries when adopting crate-derived
 namespaces. Tasks at the crate root gain a prefix, and tasks under a different
 domain gain the crate prefix as well. For example, the default name for
 `bake_cargo::releases::github::release` is `cargo:releases:github:release`.
-Bake Cargo 0.2.9 exposes this command and keeps `releases:github:release` as a
-temporary, explicitly named compatibility alias while callers migrate.
+Call that full name in workflows and task chains; the short
+`releases:github:release` compatibility alias was removed in Bake Cargo 0.3.0.
+The standard publishing workflow also uses `cargo:release:detect`,
+`cargo:publish:pending`, and `cargo:release:publish` for the release lifecycle.
 Use explicit names to preserve existing command contracts where needed.
 Existing module paths that already start with the crate's domain are unchanged.
 
