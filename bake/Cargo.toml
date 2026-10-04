@@ -10,7 +10,7 @@ bake = { version = "0.17.4", path = ".." }
 bake-agent-context = { version = "0.2" }
 bake-test-rust = { version = "0.2" }
 bake-releases = { version = "0.2.1" }
-bake-cargo = { version = "0.2.4" }
+bake-cargo = { version = "0.2.9" }
 bake-license = { version = "0.1.1" }
 
 [dev-dependencies]
