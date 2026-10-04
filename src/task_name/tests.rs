@@ -101,7 +101,7 @@ fn preserves_explicit_names_binaries_and_other_crates() {
         ),
         (resolved!("test", "bake_test_rust", false), "test"),
         (
-            resolved!("package", "bake_cargo::cargo", false),
+            resolved!("package", "bake_example::cargo", false),
             "cargo:package",
         ),
         (resolved!("greet", "bake_rust_tasks", false), "greet"),
