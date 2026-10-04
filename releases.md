@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-- Document semantic task-library APIs, explicit task namespaces, and testing
+- Derive default task namespaces from `bake_*` library crate names, stripping
+  `bake_` and translating remaining underscores to colons. Preserve explicit
+  names, project binary names, and matching module prefixes. Existing unnamed
+  library tasks outside those prefixes gain a namespace; use explicit names to
+  retain their previous commands.
+- Document semantic task-library APIs, crate-derived namespaces, and testing
   conventions aligned with `socketry-project`.
 
 ## v0.17.4

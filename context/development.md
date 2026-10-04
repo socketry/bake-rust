@@ -8,8 +8,10 @@ repository. It complements the public usage guides in this directory.
 Bake is a Cargo-compatible task runner inspired by Samuel Williams's Ruby Bake.
 The project-local task binary contains ordinary typed Rust functions. The launcher
 discovers and runs that binary through Cargo. `#[bake::task]` registers functions
-for `Registry::discover()`. Nested Rust modules define namespaces; task library
-dependencies must be referenced by the executable to make the linker include them.
+for `Registry::discover()`. Library crates named `bake_*` supply default task
+prefixes, extended by nested Rust modules. Project binaries keep module-based
+naming. Task library dependencies must be referenced by the executable to make
+the linker include them.
 
 ## Source map
 

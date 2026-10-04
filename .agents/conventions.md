@@ -1,7 +1,7 @@
 # Conventions
 
 - Keep shared Rust conventions in the `bake-agent-context` package. This file records Bake-specific choices.
-- Follow `socketry-project` for crate/module paths and test layout. Use semantic Rust APIs and explicit names for exported namespaced tasks as described in `context/task-libraries.md`; follow `context/testing-task-libraries.md` for library, task, and executable tests.
+- Follow `socketry-project` for crate/module paths and test layout. Use semantic Rust APIs and the default crate-derived namespaces for `bake_*` libraries as described in `context/task-libraries.md`. Use explicit names for exceptions and compatibility; follow `context/testing-task-libraries.md` for library, task, and executable tests.
 - Add task libraries to the private `bake/` package and run `cargo bake --regenerate` to link them. Resolve the library under development to the current checkout, including transitive dependencies.
 - Keep project automation in the unpublished `bake/` workspace member. Never publish that package.
 - Keep the core synchronous; task functions may start a runtime or subprocess when needed.

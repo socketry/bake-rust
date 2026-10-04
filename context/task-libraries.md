@@ -104,8 +104,8 @@ state, or needs a different calling interface. Avoid forwarding layers that
 add no meaning. Task functions remain callable as ordinary Rust functions;
 their visibility should reflect the intended Rust API.
 
-For example, this illustrative arrangement puts the task in `lib.rs` and
-keeps file reading and document parsing in private implementation modules:
+For example, this illustrative `bake_releases` library puts the task in
+`lib.rs` and keeps file reading and document parsing in private modules:
 
 ```text
 src/
@@ -126,7 +126,7 @@ pub use document::extract_notes;
 pub use notes::read_notes;
 
 /// Extract the notes for an exact release heading.
-#[bake::task(name = "releases:notes")]
+#[bake::task]
 pub fn notes(
     context: &mut Context,
     version: String,
@@ -160,36 +160,47 @@ current exports of `bake-releases`.
 Rust callers can use the parser, call `read_notes` with an explicit path, or
 call the Bake adapter. They do not need to construct a `Context` to read a file.
 
-## Declare explicit task namespaces
+## Let the library define the default task namespace
 
 Use domain namespaces and meaningful operations, such as `releases:notes`,
 `license:update`, and `cargo:version:bump`. Existing task names and argument
 contracts are compatibility boundaries.
 
-The crate already supplies the Rust namespace. In the example above, the root
-function is `bake_releases::notes` for Rust callers and `releases:notes` for
-Bake callers. The attribute supplies the command namespace explicitly; Bake
-does not derive `releases` from the crate name. An additional public `releases`
-module would repeat the domain already named by the crate.
+For a library crate whose Rust name starts with `bake_`, `#[bake::task]`
+derives a namespace by removing that prefix and replacing the remaining
+underscores with colons. It then appends nested modules and the function name:
 
-For exported namespaced tasks, prefer a fully qualified attribute such as
-`#[bake::task(name = "releases:notes")]`. This preserves the command name when
-the Rust function moves into a private module or is re-exported at the root.
-Keep task placement close to the semantic operations it exposes. An explicit
-command name permits implementation refactoring without requiring a matching
-public module hierarchy.
+| Rust function | Default task name |
+| --- | --- |
+| `bake_releases::notes` | `releases:notes` |
+| `bake_agent_context::install` | `agent:context:install` |
+| `bake_cargo::version::bump` | `cargo:version:bump` |
 
-Bake still supports inferred namespaces. Without a fully qualified name, the
-defining Rust module path beneath the crate root supplies the namespace;
-package names do not add a prefix. Nested modules add parts, and underscores
-in module names become hyphens. A name containing `:` is used as-is. A short
-explicit name changes the task's final name but still receives its defining
-module's prefix. Re-exporting a function does not change that defining path.
+The crate supplies the Rust namespace and the default command prefix. An
+additional public `releases` module would repeat the domain already named by
+`bake_releases`. Keep task placement close to the semantic operations it
+exposes. Use the default attribute when the defining crate, modules, and
+function already express the intended task name.
 
-Inferred names are useful for local project tasks or when a semantic module
-already matches the intended command namespace. To export a root command such
-as `test`, define its annotated function at the crate root. Moving that function
-into a module with `name = "test"` would add the module prefix.
+Underscores in module names retain their existing hyphen conversion; function
+names remain unchanged. The namespace uses the defining Rust crate name, even
+when a consumer renames its dependency. Re-exporting a function does not change
+its defining module path. When existing modules already start with the complete
+crate-derived namespace, that prefix appears only once:
+`bake_releases::releases::notes` still registers as `releases:notes`.
+
+Project binary targets keep their existing module-based naming, including
+binaries whose names start with `bake_`. Cargo identifies those targets through
+`CARGO_BIN_NAME`. Libraries without the `bake_` prefix also keep module-based
+naming; their crate name does not become a command prefix.
+
+Use an explicit `name` when a command intentionally differs from the default
+or needs to remain stable across implementation moves. Explicit names retain
+their existing behavior: a name containing `:` is used as-is, while a short
+name receives only its defining module's namespace. Neither receives a new
+crate-derived prefix. Thus a root function marked `#[bake::task(name = "test")]`
+still exports `test` from `bake_test_rust`. A function marked
+`#[bake::task(name = "releases:notes")]` keeps that command from any module.
 
 The attribute generates argument conversion, a descriptor, and registration.
 The library depends on `bake` to use these facilities. No additional registration
@@ -293,6 +304,13 @@ arguments, results, and hook behavior. Preserve those contracts while moving
 implementation into semantic modules and adding root re-exports. Keep existing
 Rust import paths as compatibility re-exports when needed, and document any
 intentional breaking API or output change.
+
+Review unnamed tasks in `bake_*` libraries when adopting crate-derived
+namespaces. Tasks at the crate root gain a prefix, and tasks under a different
+domain gain the crate prefix as well. For example,
+`bake_cargo::releases::github::release` becomes `cargo:releases:github:release`;
+use `name = "releases:github:release"` to preserve its previous command name.
+Existing module paths that already start with the crate's domain are unchanged.
 
 Then align the task adapters, local dependency resolution, and tests with this
 guide. Reuse Socketry's layout and testing guidance, and record domain-specific

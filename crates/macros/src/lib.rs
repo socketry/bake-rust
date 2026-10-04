@@ -133,6 +133,7 @@ fn expand(
             .trim_start_matches("r#")
             .to_uppercase()
     );
+    let infer_crate_namespace = name.is_none();
     let command_name = name.unwrap_or_else(|| {
         LitStr::new(
             function_name.to_string().trim_start_matches("r#"),
@@ -312,6 +313,7 @@ fn expand(
             #runtime::__private::TaskRegistration {
                 factory: #descriptor_name,
                 module_path: module_path!(),
+                infer_crate_namespace: #infer_crate_namespace && option_env!("CARGO_BIN_NAME").is_none(),
                 builtin: #builtin,
             };
     })
