@@ -40,32 +40,28 @@ fn resolves_library_names_and_complete_matching_module_prefixes() {
             "cargo:build-tools:check_all",
         ),
         (
-            resolved!("notes", "bake_releases::releases", true),
-            "releases:notes",
+            resolved!("bump", "bake_example::example::version", true),
+            "example:version:bump",
         ),
         (
-            resolved!("bump", "bake_cargo::cargo::version", true),
-            "cargo:version:bump",
+            resolved!("list", "bake_agent_context::context", true),
+            "agent:context:context:list",
         ),
         (
-            resolved!("list", "bake_agent_context::agent::context", true),
-            "agent:context:list",
+            resolved!("list", "bake_agent_context::context::skill", true),
+            "agent:context:context:skill:list",
         ),
         (
-            resolved!("list", "bake_agent_context::agent::context::skills", true),
-            "agent:context:skills:list",
+            resolved!("list", "bake_example::agent::other", true),
+            "example:agent:other:list",
         ),
         (
-            resolved!("list", "bake_agent_context::agent::other", true),
-            "agent:context:agent:other:list",
+            resolved!("list", "bake_example::agent", true),
+            "example:agent:list",
         ),
         (
-            resolved!("list", "bake_agent_context::agent", true),
-            "agent:context:agent:list",
-        ),
-        (
-            resolved!("list", "bake_agent_context::agent::contextual", true),
-            "agent:context:agent:contextual:list",
+            resolved!("list", "bake_example::agent::contextual", true),
+            "example:agent:contextual:list",
         ),
         (
             resolved!("list", "bake_agent_context::agent_context", true),
@@ -78,6 +74,10 @@ fn resolves_library_names_and_complete_matching_module_prefixes() {
         (
             resolved!("inspect", "bake_cargo::carg", true),
             "cargo:carg:inspect",
+        ),
+        (
+            resolved!("inspect", "bake_example::example", true),
+            "example:inspect",
         ),
         (
             resolved!("inspect", "bake_cargo::releases::github", true),
@@ -94,6 +94,10 @@ fn preserves_explicit_names_binaries_and_other_crates() {
         (
             resolved!("project:inspect", "bake_example::other_module", true),
             "project:inspect",
+        ),
+        (
+            resolved!("agent:context:list", "bake_agent_context::context", true),
+            "agent:context:list",
         ),
         (resolved!("test", "bake_test_rust", false), "test"),
         (

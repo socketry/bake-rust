@@ -170,24 +170,30 @@ For a library crate whose Rust name starts with `bake_`, `#[bake::task]`
 derives a namespace by removing that prefix and replacing the remaining
 underscores with colons. It then appends nested modules and the function name:
 
-| Rust function | Default task name |
+| Task definition | Task name |
 | --- | --- |
-| `bake_releases::notes` | `releases:notes` |
-| `bake_agent_context::install` | `agent:context:install` |
-| `bake_cargo::version::bump` | `cargo:version:bump` |
+| `bake_releases::notes` with `#[bake::task]` | `releases:notes` |
+| `bake_agent_context::install` with `#[bake::task]` | `agent:context:install` |
+| `bake_agent_context::skill_list` with `name = "agent:context:skill:list"` | `agent:context:skill:list` |
+| `bake_cargo::version::bump` with `#[bake::task]` | `cargo:version:bump` |
 
 The crate supplies the Rust namespace and the default command prefix. An
 additional public `releases` module would repeat the domain already named by
-`bake_releases`. Keep task placement close to the semantic operations it
-exposes. Use the default attribute when the defining crate, modules, and
-function already express the intended task name.
+`bake_releases`; likewise, a public `context` module would repeat the final
+segment of `bake_agent_context`. Keep task placement close to the semantic
+operations it exposes. Use the default attribute when the defining crate,
+modules, and function already express the intended task name; use a full
+explicit name when a meaningful module path would otherwise add an unwanted
+command segment or the function name does not express the command's semantic
+form.
 
 Underscores in module names retain their existing hyphen conversion; function
 names remain unchanged. The namespace uses the defining Rust crate name, even
 when a consumer renames its dependency. Re-exporting a function does not change
-its defining module path. When existing modules already start with the complete
-crate-derived namespace, that prefix appears only once:
-`bake_releases::releases::notes` still registers as `releases:notes`.
+its defining module path. For existing code whose modules already start with the
+complete crate-derived namespace, inference includes the prefix only once. New
+task libraries should avoid that redundant module layer; for example, define
+`notes` in `bake_releases` instead of `bake_releases::releases`.
 
 Project binary targets keep their existing module-based naming, including
 binaries whose names start with `bake_`. Cargo identifies those targets through
