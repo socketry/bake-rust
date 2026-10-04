@@ -1,5 +1,15 @@
 # Structuring Bake Tasks in Crates
 
+Define reusable automation as semantic Rust APIs and expose those operations as
+Bake tasks with stable command names.
+
+For Socketry projects, follow the
+[crate and module conventions](https://github.com/socketry/socketry-project-rust/blob/main/context/conventions.md)
+and [source layout](https://github.com/socketry/socketry-project-rust/blob/main/context/layout.md)
+provided by `socketry-project`. This guide explains how those conventions apply
+to Bake task libraries. See [Testing Task Libraries](testing-task-libraries.md)
+for verification at the library, task, and executable boundaries.
+
 Bake has two common places for task functions:
 
 - A project's unpublished `bake/` binary crate holds tasks specific to that
@@ -46,50 +56,172 @@ fn main() -> bake::Result<()> {
 ```
 
 Task functions in `release.rs` are ordinary Rust functions annotated with
-`#[bake::task]`. Keep them next to the project automation they implement. If a
-task module grows, split it into child modules and use their names to organize
-the command list.
+`#[bake::task]`. Keep them next to the project automation they implement. Split
+growing modules by domain, and preserve existing command names when moving
+functions between modules.
 
-## Export tasks from a reusable library
+## Start with a semantic Rust interface
 
 Put reusable tasks in the library crate that owns the behavior they automate.
-Use public, semantic modules rather than a generic `tasks` module, because module
-names become command namespaces:
+Give ordinary Rust callers an interface expressed in the library's domain:
+
+- Use functions for operations such as `extract_notes(document, version)` or
+  `update_document(document, version)`.
+- Use objects when they own meaningful state, such as an `Installer` that holds
+  discovered packages and supports `install_all` and `install_package`.
+- Accept the paths, documents, options, and collaborators an operation needs.
+  Keep project-root resolution and task invocation at the Bake boundary.
+- Return domain values and errors that callers can inspect. Use descriptive
+  result types when several related values form one result.
+
+Standardize vocabulary, inputs, results, and failure semantics where libraries
+perform the same kind of operation. For example, `list` enumerates available
+items, `show` retrieves selected content, and `update` maintains an existing
+resource. Use `plan` and `apply` when inspecting proposed changes separately
+from applying them is useful. Add only the operations the domain needs.
+
+Preserve domain-specific signatures. Add a shared trait when real consumers
+need interchangeable implementations. Use options structs for coherent sets
+of options and objects for meaningful state; small operations can remain
+functions.
+
+Follow Socketry's rule that the crate name supplies the root Rust namespace.
+Re-export the main API from private implementation modules. Public modules
+should identify a meaningful part of the domain. Do not add a public wrapper
+such as `bake_releases::releases` solely to obtain a command prefix.
+
+## Expose operations as Bake tasks
+
+A task function adapts command arguments and execution context to the semantic
+API. Keep substantial parsing, transformations, and filesystem or subprocess
+operations in the implementation that ordinary Rust callers use. The adapter
+can resolve paths, select options, obtain context state, invoke hooks, and
+choose the task result.
+
+When an operation already has a suitable task signature, annotate it directly.
+Separate adapters are useful when the library accepts borrowed values, owns
+state, or needs a different calling interface. Avoid forwarding layers that
+add no meaning. Task functions remain callable as ordinary Rust functions;
+their visibility should reflect the intended Rust API.
+
+For example, this illustrative arrangement puts the task in `lib.rs` and
+keeps file reading and document parsing in private implementation modules:
 
 ```text
-socketry-executor/
-├── Cargo.toml
-└── src/
-    ├── lib.rs
-    └── executor.rs
+src/
+├── lib.rs
+├── document.rs
+└── notes.rs
 ```
 
 ```rust,ignore
 // src/lib.rs
-pub mod executor;
-```
-
-```rust,ignore
-// src/executor.rs
 use bake::{Context, Result};
+use std::path::PathBuf;
 
-/// Print information about the executor configuration.
-#[bake::task]
-pub fn print_name(context: &mut Context) -> Result<String> {
-    Ok(format!("executor root: {}", context.root().display()))
+mod document;
+mod notes;
+
+pub use document::extract_notes;
+pub use notes::read_notes;
+
+/// Extract the notes for an exact release heading.
+#[bake::task(name = "releases:notes")]
+pub fn notes(
+    context: &mut Context,
+    version: String,
+    #[bake(
+        default = "releases.md",
+        help = "Release document relative to the project root."
+    )]
+    path: PathBuf,
+) -> Result<String> {
+    read_notes(&context.root().join(path), &version)
 }
 ```
 
-The task is discovered as `executor:print_name`. Namespace parts come from the
-Rust module path beneath the library crate root; package names do not add a
-namespace. Nested modules add more parts. Underscores in module names become
-hyphens. An explicit task name containing `:` is used as-is, without a module
-prefix.
+```rust,ignore
+// src/notes.rs
+use bake::{Error, Result};
+use std::path::Path;
 
-The same crate can export normal Rust APIs and Bake tasks. A task function is
-still callable as an ordinary function; the attribute also generates its task
-descriptor and registration entry. It needs a dependency on `bake` so it can
-use the attribute and Bake types.
+/// Read the notes for an exact release heading from a document file.
+pub fn read_notes(path: &Path, version: &str) -> Result<String> {
+    let document = std::fs::read_to_string(path)
+        .map_err(|error| Error::new(format!("{}: {error}", path.display())))?;
+    Ok(crate::extract_notes(&document, version)?.to_owned())
+}
+```
+
+The parser in `document.rs` supplies
+`extract_notes<'a>(document: &'a str, version: &str) -> Result<&'a str>`.
+The example illustrates a proposed library layout; it does not describe the
+current exports of `bake-releases`.
+Rust callers can use the parser, call `read_notes` with an explicit path, or
+call the Bake adapter. They do not need to construct a `Context` to read a file.
+
+## Declare explicit task namespaces
+
+Use domain namespaces and meaningful operations, such as `releases:notes`,
+`license:update`, and `cargo:version:bump`. Existing task names and argument
+contracts are compatibility boundaries.
+
+The crate already supplies the Rust namespace. In the example above, the root
+function is `bake_releases::notes` for Rust callers and `releases:notes` for
+Bake callers. The attribute supplies the command namespace explicitly; Bake
+does not derive `releases` from the crate name. An additional public `releases`
+module would repeat the domain already named by the crate.
+
+For exported namespaced tasks, prefer a fully qualified attribute such as
+`#[bake::task(name = "releases:notes")]`. This preserves the command name when
+the Rust function moves into a private module or is re-exported at the root.
+Keep task placement close to the semantic operations it exposes. An explicit
+command name permits implementation refactoring without requiring a matching
+public module hierarchy.
+
+Bake still supports inferred namespaces. Without a fully qualified name, the
+defining Rust module path beneath the crate root supplies the namespace;
+package names do not add a prefix. Nested modules add parts, and underscores
+in module names become hyphens. A name containing `:` is used as-is. A short
+explicit name changes the task's final name but still receives its defining
+module's prefix. Re-exporting a function does not change that defining path.
+
+Inferred names are useful for local project tasks or when a semantic module
+already matches the intended command namespace. To export a root command such
+as `test`, define its annotated function at the crate root. Moving that function
+into a module with `name = "test"` would add the module prefix.
+
+The attribute generates argument conversion, a descriptor, and registration.
+The library depends on `bake` to use these facilities. No additional registration
+framework or common task-library trait is needed.
+
+## Keep task contracts predictable
+
+- Use typed parameters. Required scalars are positional by default; defaults,
+  `Option`, and `Vec` produce named options. Use `#[bake(named)]` for a required
+  named option and document the purpose of arguments with `help`.
+- Resolve project-relative paths against `context.root()`. Use
+  `context.command(...)` for project subprocesses, or pass an explicit working
+  directory to an operation acting on another checkout. Avoid changing the
+  process-wide working directory or environment.
+- Validate inputs before making changes. Include the affected file, package,
+  or command in errors when that context helps identify the failure. Propagate
+  failures from operations and hooks.
+- Return the semantic result. Text is appropriate for release notes; a list
+  or serializable result struct suits package metadata or an update summary.
+  Use `()` when there is no useful result. Avoid making callers parse a success
+  message to recover counts, paths, or other structured data. Existing output
+  shapes also need compatibility consideration when migrating a library.
+- Let Bake's `output` task format the final result. Send progress and diagnostics
+  to stderr. Use `#[bake::task(output)]` only when the task owns its final output;
+  subprocess progress alone does not require it.
+
+Use ordinary Rust calls to compose implementation operations. Use
+`context.call(...)` where composition is intentionally through registered
+tasks, including project-defined hooks. Use `call_if_registered` for optional
+hooks and document when they run and which arguments they receive. Libraries
+can cache project-scoped discovery in `Context` when several tasks need it;
+the underlying API should also accept the discovered state directly.
 
 ## Consume task libraries
 
@@ -111,17 +243,16 @@ declaration to the selected binary if needed. It preserves the rest of the task
 source. Put reusable task libraries in `[dependencies]`; ordinary dependencies
 used by task code are also linked.
 
-No per-task imports or registration calls are needed. The dependency's module
-names define its task namespaces, and `Registry::discover()` reports an error
-if two linked crates register the same task name. A crate used only as a normal
-Rust dependency does not need to expose a Bake executable; Cargo does not run a
-dependency's binary target when building your application.
+No per-task imports or registration calls are needed. The task attributes and
+defining modules determine command names. `Registry::discover()` reports an
+error if two linked crates register the same task name. A crate used only as a
+normal Rust dependency does not need to expose a Bake executable; Cargo does
+not run a dependency's binary target when building your application.
 
-The `bake-agent-context` task library adds `agent:context:list`,
-`agent:context:show`, `agent:context:install`, and `agent:context:agents-md` to
-the same executable. Run `cargo bake agent:context:install` to copy context from
-resolved dependencies into `.agents/context/` and update `agents.md`. Ignore
-`.agents/context/` because it is generated from the resolved dependencies.
+The `bake-agent-context` task library provides dependency context discovery and
+installation in the same executable. Run `cargo bake agent:context:install`
+to install guidance from resolved dependencies. Follow that package's context
+for the generated index, skills, and repository-owned agent instructions.
 
 If ordinary users of a library should not inherit its Bake dependency, put the
 tasks in a separate companion crate, such as `socketry-executor-bake`. The
@@ -129,14 +260,42 @@ project's task binary then depends on and references that companion crate instea
 This keeps the main library's dependencies smaller, at the cost of one extra
 package dependency for projects that want its tasks.
 
-For a working example, see [Bake Releases](https://github.com/socketry/bake-releases-rust), whose
-`releases` module provides `releases:notes` and `releases:update`. The [Bake
-Cargo](https://github.com/socketry/bake-cargo-rust) crate adds Cargo workspace
-discovery, package publishing, GitHub release creation, publish-workflow
-generation, GitHub ruleset and environment setup, crates.io trusted-publisher
-configuration, shared Cargo version changes, and release-candidate checks. Its
-version tasks optionally call a project-defined `cargo:after_version_bump` task
-with the new version. A private `bake/` crate can use that hook to compose
-[Bake License](https://github.com/socketry/bake-license-rust), Bake Releases,
-and other project-specific release tasks. If the hook is not registered, the
-version task simply completes without project-specific updates.
+## Use shared project composition
+
+In Socketry repositories, depend on `socketry-project` in the private `bake/`
+package to obtain the standard development tasks and release hook. Its
+`cargo:after_version_bump` hook composes license, release-note, and readme
+updates. Keep this composition in the shared project crate, and keep the local
+executable focused on project-specific additions. A reusable task library
+should not depend on `socketry-project` merely to obtain its own development
+tooling.
+
+During development of a task library, ensure the private executable resolves
+that library to the current checkout, including when it arrives transitively
+through `socketry-project`. For example, the root workspace manifest of
+`bake-releases` can contain:
+
+```toml
+[patch.crates-io]
+bake-releases = { path = "." }
+```
+
+The local package version must satisfy the dependency requirements. Inspect
+Cargo's resolved dependency graph; adding a direct path dependency alone can
+leave a second registry copy linked through another dependency. Refresh the
+lockfile when resolution changes, and regenerate task links when dependencies
+of the private executable change.
+
+## Align an existing library
+
+Start by identifying the public Rust operations, registered command names,
+arguments, results, and hook behavior. Preserve those contracts while moving
+implementation into semantic modules and adding root re-exports. Keep existing
+Rust import paths as compatibility re-exports when needed, and document any
+intentional breaking API or output change.
+
+Then align the task adapters, local dependency resolution, and tests with this
+guide. Reuse Socketry's layout and testing guidance, and record domain-specific
+exceptions in the library's own context. Apply the conventions as each library
+is reviewed; the illustrative APIs above do not imply that all current task
+libraries have already adopted them.
