@@ -1,6 +1,6 @@
 # Releases
 
-## Unreleased
+## v0.18.0
 
 - Derive default task namespaces from `bake_*` library crate names, stripping
   `bake_` and translating remaining underscores to colons. Preserve explicit
