@@ -15,12 +15,12 @@ mod version {
     }
 
     #[bake::task(name = "show")]
-    fn inspect() -> bake::Result<String> {
+    pub fn inspect() -> bake::Result<String> {
         Ok("explicit short name".to_owned())
     }
 
     #[bake::task(name = "release:prepare")]
-    fn prepare() -> bake::Result<String> {
+    pub fn prepare() -> bake::Result<String> {
         Ok("explicit full name".to_owned())
     }
 }
@@ -31,6 +31,40 @@ fn run_tests() -> Result<String> {
 }
 
 pub use version::bump;
+
+mod namespace {
+    #[bake::task]
+    pub fn legacy() -> bake::Result<String> {
+        Ok("matching module prefix".to_owned())
+    }
+}
+
+#[test]
+fn descriptors_and_discovery_use_the_same_final_names() {
+    let discovered = Registry::discover().unwrap();
+    let mut manual = Registry::new();
+    for (descriptor, expected) in [
+        (inspect_task(), "namespace:inspect"),
+        (version::bump_task(), "namespace:version:bump"),
+        (version::inspect_task(), "version:show"),
+        (version::prepare_task(), "release:prepare"),
+        (run_tests_task(), "test"),
+        (namespace::legacy_task(), "namespace:legacy"),
+    ] {
+        assert_eq!(descriptor.name(), expected);
+        assert!(discovered.tasks().any(|task| task.name() == expected));
+        manual.register(descriptor).unwrap();
+    }
+    let mut context = manual.context(".");
+    assert_eq!(
+        context.call("namespace:version:bump", &["2.0.0"]).unwrap(),
+        "2.0.0"
+    );
+    assert_eq!(
+        context.call("namespace:legacy", &[]).unwrap(),
+        "matching module prefix"
+    );
+}
 
 #[test]
 fn discovers_and_invokes_defaults_from_the_defining_crate_and_modules() {

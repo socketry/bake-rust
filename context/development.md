@@ -17,7 +17,8 @@ the linker include them.
 
 - src/arguments.rs: parameter metadata, typed validation, command-line parsing.
 - src/task.rs: task descriptor and handler interface.
-- src/registry.rs: registration, namespaces, command planning, help and output.
+- src/task_name.rs: constant-evaluated crate and module namespace inference.
+- src/registry.rs: registration, namespace imports, command planning, help and output.
 - src/output.rs: replaceable default output, raw/JSON/NDJSON formatting, and null sink.
 - src/context.rs: shared state, project root, previous result, nested calls.
 - crates/macros/: task attribute and generated adapters; re-exported by bake.
@@ -41,6 +42,8 @@ registered tasks are linked into the binary.
 - Task registration uses linkme's linker inventory. It is static, not a dynamic
   plugin ABI. Dependencies that contribute tasks must be referenced in the task
   binary, e.g. `use bake_releases as _;`.
+- The macro resolves names through Rust constant evaluation. Generated descriptors
+  have their final names before discovery; the registry validates and collects them.
 - The launcher reads Cargo metadata format 1; it does not link Cargo internals.
 - Package-level configuration takes precedence over workspace-level configuration.
 - The core is synchronous. An async runtime can be owned by an individual task.

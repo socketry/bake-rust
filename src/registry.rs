@@ -22,8 +22,6 @@ pub(crate) struct Invocation {
 #[doc(hidden)]
 pub struct TaskRegistration {
     pub factory: fn() -> Task,
-    pub module_path: &'static str,
-    pub infer_crate_namespace: bool,
     pub builtin: bool,
 }
 
@@ -57,6 +55,8 @@ impl Registry {
     /// and its linked dependencies. Nested Rust modules become task namespaces.
     /// Library crates named `bake_*` also supply a default namespace, with the
     /// prefix removed and remaining underscores replaced by colons.
+    /// Names are resolved at compile time in the generated descriptors, so
+    /// manual registration uses the same names as discovery.
     ///
     /// A dependency that contributes tasks must be referenced by the executable
     /// (for example, `use bake_releases as _;`) so the linker includes it.
@@ -70,13 +70,7 @@ impl Registry {
             if registration.builtin {
                 continue;
             }
-            let mut task = (registration.factory)();
-            namespace_from_module(
-                &mut task,
-                registration.module_path,
-                registration.infer_crate_namespace,
-            );
-            registry.register(task)?;
+            registry.register((registration.factory)())?;
         }
         Ok(registry)
     }
@@ -300,34 +294,6 @@ fn root_from_environment(
         .map_err(Into::into)
 }
 
-fn namespace_from_module(task: &mut Task, module_path: &str, infer_crate_namespace: bool) {
-    if task.name.contains(':') {
-        return;
-    }
-
-    let (crate_name, modules) = module_path.split_once("::").unwrap_or((module_path, ""));
-    let mut namespace = modules.replace("::", ":").replace('_', "-");
-
-    if infer_crate_namespace
-        && let Some(prefix) = crate_name
-            .strip_prefix("bake_")
-            .filter(|name| !name.is_empty())
-    {
-        let prefix = prefix.replace('_', ":");
-        if namespace.is_empty() {
-            namespace = prefix;
-        } else if namespace != prefix && !namespace.starts_with(&format!("{prefix}:")) {
-            // Existing libraries may already express their domain in wrapper
-            // modules. Keep that namespace once while they migrate to root APIs.
-            namespace = format!("{prefix}:{namespace}");
-        }
-    }
-
-    if !namespace.is_empty() {
-        task.name = format!("{namespace}:{}", task.name);
-    }
-}
-
 impl Default for Registry {
     fn default() -> Self {
         Self::new()
@@ -548,60 +514,6 @@ mod tests {
     }
 
     #[test]
-    fn adds_module_namespaces_without_overwriting_explicit_names() {
-        let mut unqualified = task("inspect", vec![]);
-        namespace_from_module(&mut unqualified, "crate::my_module::build_tasks", true);
-        assert_eq!(unqualified.name, "my-module:build-tasks:inspect");
-
-        let mut qualified = task("project:inspect", vec![]);
-        namespace_from_module(&mut qualified, "bake_example::other_module", true);
-        assert_eq!(qualified.name, "project:inspect");
-
-        let mut root = task("inspect", vec![]);
-        namespace_from_module(&mut root, "crate", true);
-        assert_eq!(root.name, "inspect");
-    }
-
-    #[test]
-    fn derives_library_namespaces_without_repeating_existing_domain_modules() {
-        for (module_path, expected) in [
-            ("bake_releases", "releases:inspect"),
-            ("bake_agent_context", "agent:context:inspect"),
-            ("bake_cargo::version", "cargo:version:inspect"),
-            ("bake_cargo::build_tools", "cargo:build-tools:inspect"),
-            ("bake_releases::releases", "releases:inspect"),
-            ("bake_cargo::cargo::version", "cargo:version:inspect"),
-            (
-                "bake_agent_context::agent::context",
-                "agent:context:inspect",
-            ),
-            (
-                "bake_agent_context::agent::other",
-                "agent:context:agent:other:inspect",
-            ),
-            ("bake_cargo::cargo_tools", "cargo:cargo-tools:inspect"),
-            ("bake_", "inspect"),
-            ("bake", "inspect"),
-            ("socketry_project", "inspect"),
-        ] {
-            let mut inferred = task("inspect", vec![]);
-            namespace_from_module(&mut inferred, module_path, true);
-            assert_eq!(inferred.name, expected, "{module_path}");
-        }
-    }
-
-    #[test]
-    fn preserves_module_only_names_for_binaries_and_explicit_short_names() {
-        let mut root = task("test", vec![]);
-        namespace_from_module(&mut root, "bake_test_rust", false);
-        assert_eq!(root.name, "test");
-
-        let mut nested = task("package", vec![]);
-        namespace_from_module(&mut nested, "bake_cargo::cargo", false);
-        assert_eq!(nested.name, "cargo:package");
-    }
-
-    #[test]
     fn converts_process_arguments_and_rejects_non_utf8_values() {
         assert_eq!(task_argument("inspect".into()).unwrap(), "inspect");
 
@@ -617,11 +529,26 @@ mod tests {
     fn propagates_discovery_output_and_writer_errors() {
         static INVALID_REGISTRATIONS: [TaskRegistration; 1] = [TaskRegistration {
             factory: invalid_task,
-            module_path: "tests",
-            infer_crate_namespace: true,
             builtin: false,
         }];
         assert!(Registry::discover_from(&INVALID_REGISTRATIONS).is_err());
+        let duplicate_registrations = [
+            TaskRegistration {
+                factory: inspection_task,
+                builtin: false,
+            },
+            TaskRegistration {
+                factory: inspection_task,
+                builtin: false,
+            },
+        ];
+        assert!(
+            Registry::discover_from(&duplicate_registrations)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("duplicate task")
+        );
 
         let mut registry = Registry::new();
         registry.register(task("inspect", vec![])).unwrap();

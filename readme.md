@@ -94,6 +94,8 @@ form namespaces by default. Library crate names beginning with `bake_` supply
 a prefix too: `bake_releases::notes` registers as `releases:notes`. A fully
 qualified name such as `#[bake::task(name = "releases:notes")]` overrides
 inference. Project binary targets keep their existing module-based names.
+Names are resolved at compile time, so generated descriptors contain the same
+final names whether registered manually or collected by `Registry::discover()`.
 
 ## Arguments and results
 

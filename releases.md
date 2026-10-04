@@ -7,6 +7,10 @@
   names, project binary names, and matching module prefixes. Existing unnamed
   library tasks outside those prefixes gain a namespace; use explicit names to
   retain their previous commands.
+- Resolve task names at compile time. Generated descriptors now include their
+  full namespaces, making manual registration and automatic discovery agree.
+  Manual registries that added those namespaces with `Registry::include` should
+  register the descriptors directly to avoid repeating the prefix.
 - Document semantic task-library APIs, crate-derived namespaces, and testing
   conventions aligned with `socketry-project`.
 

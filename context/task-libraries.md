@@ -206,6 +206,12 @@ The attribute generates argument conversion, a descriptor, and registration.
 The library depends on `bake` to use these facilities. No additional registration
 framework or common task-library trait is needed.
 
+Names are resolved during compilation from the defining `module_path!()`, the
+attribute, and Cargo's binary-target metadata. The generated `notes_task()`
+descriptor already contains `releases:notes`; registering it manually produces
+the same name as `Registry::discover()`. Discovery collects descriptors,
+validates their metadata, and detects collisions across linked crates.
+
 ## Keep task contracts predictable
 
 - Use typed parameters. Required scalars are positional by default; defaults,
@@ -311,6 +317,13 @@ domain gain the crate prefix as well. For example,
 `bake_cargo::releases::github::release` becomes `cargo:releases:github:release`;
 use `name = "releases:github:release"` to preserve its previous command name.
 Existing module paths that already start with the crate's domain are unchanged.
+
+Generated descriptors now carry their complete names before registration,
+including module namespaces for libraries without a `bake_` prefix and for
+explicit short names. Review manual registries that previously added those
+namespaces using `Registry::include`: it still prepends the supplied namespace,
+so importing an already namespaced descriptor can repeat that prefix. Register
+the descriptor directly when its inferred name is the intended command.
 
 Then align the task adapters, local dependency resolution, and tests with this
 guide. Reuse Socketry's layout and testing guidance, and record domain-specific

@@ -11,6 +11,11 @@ remove the prefix and replace remaining underscores with colons. Nested modules
 extend that namespace; matching module prefixes are included only once. Cargo
 binary targets keep their module-based names.
 
+The macro emits constant-evaluated name construction using the defining
+`module_path!()`. The generated descriptor already contains the final name;
+manual registration and discovery use the same name. Discovery validates task
+metadata and detects collisions across linked crates.
+
 Use `name = "namespace:task"` to override the entire command name. A short
 explicit name uses only the defining module's namespace, preserving existing
 aliases and root commands. Use `runtime = ::alias` if the core dependency was

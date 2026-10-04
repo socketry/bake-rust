@@ -27,6 +27,10 @@ name, removing `bake_` and replacing remaining underscores with colons. Nested
 modules extend the namespace; an existing matching module prefix is included
 only once. Project binaries and explicit names retain module-based naming,
 and a fully qualified explicit name bypasses inference.
+The macro emits constant-evaluated name construction from `module_path!()` and
+the task attributes. Generated descriptors contain their final names, so manual
+registration and discovery agree. Discovery validates metadata and detects
+duplicate names across the linked libraries.
 Follow [Structuring Bake Tasks in Crates](task-libraries.md) for semantic APIs,
 task adapters, and compatibility conventions. Rust omits unused dependencies
 from the final link, so each task library must be referenced by the executable
