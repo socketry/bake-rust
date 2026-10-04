@@ -23,10 +23,13 @@ traits, output serialization, and the original function body.
 Each task macro adds a descriptor to a linkme distributed slice. The executable
 uses `Registry::discover()` to collect tasks from itself and linked dependencies.
 Nested Rust modules determine task namespaces, while explicit task names can
-override them. Rust omits unused dependencies from the final link, so each task
-library must be referenced by the executable (an import such as
-`use bake_releases as _;` is enough). This avoids registration code for each task
-while keeping task libraries as ordinary Cargo dependencies.
+override them. Exported task libraries should use fully qualified command names
+where needed to keep those names independent of Rust implementation modules.
+Follow [Structuring Bake Tasks in Crates](task-libraries.md) for semantic APIs,
+task adapters, and compatibility conventions. Rust omits unused dependencies
+from the final link, so each task library must be referenced by the executable
+(an import such as `use bake_releases as _;` is enough). This avoids registration
+code for each task while keeping task libraries as ordinary Cargo dependencies.
 
 ## Execution is sequential and contextual
 

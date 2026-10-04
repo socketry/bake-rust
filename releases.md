@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Document semantic task-library APIs, explicit task namespaces, and testing
+  conventions aligned with `socketry-project`.
 
 ## v0.17.4
 

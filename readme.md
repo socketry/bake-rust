@@ -90,7 +90,9 @@ fn main() -> Result<()> {
 the arguments and adapts command-line input to the original function. It also adds
 the descriptor to Bake's link-time registration table. `Registry::discover()`
 collects tasks from the executable and linked task libraries. Nested Rust modules
-form namespaces, so a function in `releases::` becomes `releases:notes`.
+form namespaces by default; a fully qualified name such as
+`#[bake::task(name = "releases:notes")]` keeps the command independent of the
+function's module path.
 
 ## Arguments and results
 
@@ -176,17 +178,29 @@ the new workspace version. A project can define that task in its private
 
 ## Reusable task libraries
 
-Task functions in a library are discovered with the same attribute. Put them in
-a semantic module to give them a namespace:
+Give the library a semantic Rust API, then expose its operations with the task
+attribute. Small adapters can resolve project-relative paths and translate
+command arguments. For example, a library with a `read_notes` operation could
+expose a task directly from its crate root:
 
 ```rust,ignore
-pub mod releases {
-    #[bake::task]
-    pub fn notes(/* typed arguments */) -> bake::Result<String> {
-        // ...
-    }
+// src/lib.rs
+#[bake::task(name = "releases:notes")]
+pub fn notes(
+    context: &mut bake::Context,
+    version: String,
+    #[bake(default = "releases.md")] path: std::path::PathBuf,
+) -> bake::Result<String> {
+    read_notes(&context.root().join(path), &version)
 }
 ```
+
+Keep the main Rust API accessible at the crate root, with modules for meaningful
+domain concepts. In a `bake_releases` library, this function would be called as
+`bake_releases::notes` in Rust and `releases:notes` through Bake. The explicit
+task name supplies the command namespace, so no public `releases` wrapper
+module is needed. An operation whose signature already suits Bake can be
+annotated directly.
 
 Add the library as a Cargo dependency and reference it from the task binary so
 Rust includes its registration entries in the link:
@@ -216,8 +230,9 @@ The companion [Bake Cargo](https://github.com/socketry/bake-cargo-rust) library
 provides Cargo workspace tasks, GitHub release creation, publishing workflow
 generation, GitHub release protections, and crates.io trusted publishers. Its
 shared version tasks optionally invoke `cargo:after_version_bump` with the new
-version. This repository defines the hook to run `license:update` and
-`releases:update`. `cargo:release` validates and packages a candidate for a
+version. Socketry projects use `socketry-project` in their private task package
+to supply the shared hook for license, release-note, and readme updates.
+`cargo:release` validates and packages a candidate for a
 reviewed release pull request. After the pull request merges, the workflow waits
 for the `crates-io` environment approval, publishes the workspace through
 trusted publishing, and creates the `vVERSION` tag after all uploads succeed.
