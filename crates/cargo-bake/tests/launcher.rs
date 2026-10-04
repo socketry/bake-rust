@@ -440,8 +440,9 @@ fn regenerate_bootstraps_the_task_crate_and_refreshes_dependency_links() {
     );
 
     let bake_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
+        .parent()
+        .unwrap()
+        .parent()
         .unwrap()
         .to_string_lossy()
         .replace('\\', "/");
