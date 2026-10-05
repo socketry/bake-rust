@@ -5,7 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-socketry-project = "0.3"
+socketry-project = ">=0.3.3"
 bake = { version = "0.18.0", path = ".." }
 bake-agent-context = { version = "0.3.0" }
 bake-test-rust = { version = "0.2.2" }
