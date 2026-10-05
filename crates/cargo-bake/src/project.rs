@@ -56,7 +56,14 @@ struct Location {
 }
 
 fn metadata(manifest: &Path, options: &Options) -> Result<Metadata> {
-    let mut command = cargo();
+    metadata_with_command(manifest, options, cargo())
+}
+
+fn metadata_with_command(
+    manifest: &Path,
+    options: &Options,
+    mut command: std::process::Command,
+) -> Result<Metadata> {
     command
         .args([
             "metadata",
@@ -82,7 +89,11 @@ fn metadata(manifest: &Path, options: &Options) -> Result<Metadata> {
         )
         .into());
     }
-    Ok(serde_json::from_slice(&output.stdout)?)
+    parse_metadata(&output.stdout)
+}
+
+fn parse_metadata(output: &[u8]) -> Result<Metadata> {
+    Ok(serde_json::from_slice(output)?)
 }
 
 fn configured_manifest(metadata: &Value) -> Result<Option<&str>> {
@@ -109,40 +120,7 @@ impl Project {
             Err(_) if options.regenerate => return locate_from_manifest(&manifest),
             Err(error) => return Err(error),
         };
-        let package = project_metadata.packages.iter().find(|package| {
-            package
-                .manifest_path
-                .canonicalize()
-                .is_ok_and(|path| path == manifest)
-        });
-        let package_manifest = package
-            .map(|package| configured_manifest(&package.metadata))
-            .transpose()?
-            .flatten();
-        let workspace_root = project_metadata.workspace_root.canonicalize()?;
-        let (root, relative_manifest) = if let Some(path) = package_manifest {
-            (
-                manifest
-                    .parent()
-                    .ok_or("manifest has no parent directory")?
-                    .to_path_buf(),
-                path,
-            )
-        } else {
-            (
-                project_metadata.workspace_root.clone(),
-                configured_manifest(&project_metadata.metadata)?.unwrap_or("bake/Cargo.toml"),
-            )
-        };
-        let root = root.canonicalize()?;
-        let task_manifest = root.join(relative_manifest);
-
-        Ok(Location {
-            root,
-            workspace_manifest: workspace_root.join("Cargo.toml"),
-            workspace_root,
-            task_manifest,
-        })
+        locate_with_metadata(manifest, project_metadata)
     }
 
     pub(crate) fn discover(directory: &Path, options: &Options) -> Result<Self> {
@@ -175,12 +153,20 @@ impl Project {
 
     pub(crate) fn regenerate(directory: &Path, options: &Options) -> Result<()> {
         let location = Self::locate(directory, options)?;
+        Self::regenerate_at_location(&location, options, |path| path.canonicalize())
+    }
+
+    fn regenerate_at_location(
+        location: &Location,
+        options: &Options,
+        canonicalize: impl Fn(&Path) -> std::io::Result<PathBuf>,
+    ) -> Result<()> {
         let created = !location.task_manifest.is_file();
         if created {
-            bootstrap_task_package(&location)?;
+            bootstrap_task_package(location)?;
         }
 
-        let task_manifest = location.task_manifest.canonicalize()?;
+        let task_manifest = canonicalize(&location.task_manifest)?;
         let task_metadata = metadata(&task_manifest, options)?;
         let package = task_metadata
             .packages
@@ -199,7 +185,7 @@ impl Project {
         let generated_path = binary
             .src_path
             .parent()
-            .ok_or("binary source path has no parent directory")?
+            .unwrap_or_else(|| unreachable!("Cargo binary source paths have a parent directory"))
             .join("bake_generated_tasks/mod.rs");
         write_if_changed(&generated_path, &generated_source)?;
         add_generated_module(&binary.src_path)?;
@@ -216,6 +202,51 @@ impl Project {
         );
         Ok(())
     }
+}
+
+fn locate_with_metadata(manifest: PathBuf, project_metadata: Metadata) -> Result<Location> {
+    locate_with_metadata_using(manifest, project_metadata, |path| path.canonicalize())
+}
+
+fn locate_with_metadata_using(
+    manifest: PathBuf,
+    project_metadata: Metadata,
+    canonicalize: impl Fn(&Path) -> std::io::Result<PathBuf>,
+) -> Result<Location> {
+    let package = project_metadata.packages.iter().find(|package| {
+        package
+            .manifest_path
+            .canonicalize()
+            .is_ok_and(|path| path == manifest)
+    });
+    let package_manifest = package
+        .map(|package| configured_manifest(&package.metadata))
+        .transpose()?
+        .flatten();
+    let workspace_root = canonicalize(&project_metadata.workspace_root)?;
+    let (root, relative_manifest) = if let Some(path) = package_manifest {
+        (
+            manifest
+                .parent()
+                .unwrap_or_else(|| unreachable!("Cargo manifest paths have a parent directory"))
+                .to_path_buf(),
+            path,
+        )
+    } else {
+        (
+            project_metadata.workspace_root.clone(),
+            configured_manifest(&project_metadata.metadata)?.unwrap_or("bake/Cargo.toml"),
+        )
+    };
+    let root = canonicalize(&root)?;
+    let task_manifest = root.join(relative_manifest);
+
+    Ok(Location {
+        root,
+        workspace_manifest: workspace_root.join("Cargo.toml"),
+        workspace_root,
+        task_manifest,
+    })
 }
 
 fn table_item<'document>(item: Option<&'document Item>, key: &str) -> Option<&'document Item> {
@@ -239,9 +270,21 @@ fn configured_manifest_from_toml(document: &DocumentMut, section: &str) -> Resul
     }
 }
 
-fn workspace_manifest_for(manifest: &Path, document: &DocumentMut) -> Result<PathBuf> {
+#[cfg(test)]
+fn workspace_manifest_for(
+    manifest: &Path,
+    document: &DocumentMut,
+) -> Result<(PathBuf, DocumentMut)> {
+    workspace_manifest_for_using(manifest, document, |path| path.canonicalize())
+}
+
+fn workspace_manifest_for_using(
+    manifest: &Path,
+    document: &DocumentMut,
+    canonicalize: impl Fn(&Path) -> std::io::Result<PathBuf>,
+) -> Result<(PathBuf, DocumentMut)> {
     if document.as_table().contains_key("workspace") {
-        return Ok(manifest.to_path_buf());
+        return Ok((manifest.to_path_buf(), document.clone()));
     }
 
     if let Some(workspace_path) = table_item(document.as_table().get("package"), "workspace")
@@ -251,10 +294,11 @@ fn workspace_manifest_for(manifest: &Path, document: &DocumentMut) -> Result<Pat
         let parent = manifest
             .parent()
             .ok_or("manifest has no parent directory")?;
-        return Ok(parent
-            .join(workspace_path)
-            .join("Cargo.toml")
-            .canonicalize()?);
+        let workspace_manifest = parent.join(workspace_path).join("Cargo.toml");
+        let workspace_manifest = canonicalize(&workspace_manifest)?;
+        let contents = fs::read_to_string(&workspace_manifest)?;
+        let document = contents.parse::<DocumentMut>()?;
+        return Ok((workspace_manifest, document));
     }
 
     let parent = manifest
@@ -269,27 +313,35 @@ fn workspace_manifest_for(manifest: &Path, document: &DocumentMut) -> Result<Pat
             continue;
         };
         if document.as_table().contains_key("workspace") {
-            return Ok(candidate.canonicalize()?);
+            return Ok((canonicalize(&candidate)?, document));
         }
     }
 
-    Ok(manifest.to_path_buf())
+    Ok((manifest.to_path_buf(), document.clone()))
 }
 
 fn locate_from_manifest(manifest: &Path) -> Result<Location> {
+    locate_from_manifest_using(manifest, |path| path.canonicalize())
+}
+
+fn locate_from_manifest_using(
+    manifest: &Path,
+    canonicalize: impl Fn(&Path) -> std::io::Result<PathBuf>,
+) -> Result<Location> {
     let contents = fs::read_to_string(manifest)?;
     let document = contents.parse::<DocumentMut>()?;
-    let workspace_manifest = workspace_manifest_for(manifest, &document)?;
-    let workspace_contents = fs::read_to_string(&workspace_manifest)?;
-    let workspace_document = workspace_contents.parse::<DocumentMut>()?;
-    let workspace_root = workspace_manifest
-        .parent()
-        .ok_or("workspace manifest has no parent directory")?
-        .canonicalize()?;
-    let package_root = manifest
-        .parent()
-        .ok_or("manifest has no parent directory")?
-        .canonicalize()?;
+    let (workspace_manifest, workspace_document) =
+        workspace_manifest_for_using(manifest, &document, &canonicalize)?;
+    let workspace_root = canonicalize(
+        workspace_manifest
+            .parent()
+            .unwrap_or_else(|| unreachable!("Cargo manifest paths have a parent directory")),
+    )?;
+    let package_root = canonicalize(
+        manifest
+            .parent()
+            .unwrap_or_else(|| unreachable!("Cargo manifest paths have a parent directory")),
+    )?;
     let package_manifest = configured_manifest_from_toml(&document, "package")?;
     let root = if package_manifest.is_some() {
         package_root
@@ -369,6 +421,13 @@ fn write_if_changed(path: &Path, contents: &str) -> Result<()> {
 }
 
 fn add_generated_module(source_path: &Path) -> Result<()> {
+    add_generated_module_using(source_path, remove_legacy_generated_module)
+}
+
+fn add_generated_module_using(
+    source_path: &Path,
+    remove_legacy: impl FnOnce(&Path) -> Result<()>,
+) -> Result<()> {
     const PATH_ATTRIBUTE: &str = "#[path = \"bake_generated_tasks/mod.rs\"]";
     const MODULE_ITEM: &str = "mod bake_generated_tasks;";
     const LEGACY_PATH_ATTRIBUTE: &str = "#[path = \"__bake_generated_tasks/mod.rs\"]";
@@ -391,7 +450,7 @@ fn add_generated_module(source_path: &Path) -> Result<()> {
         };
         source = source.replace(&legacy_module, &replacement);
         write_if_changed(source_path, &source)?;
-        remove_legacy_generated_module(source_path)?;
+        remove_legacy(source_path)?;
         return Ok(());
     }
     if has_generated_module {
@@ -417,6 +476,13 @@ fn add_generated_module(source_path: &Path) -> Result<()> {
 }
 
 fn remove_legacy_generated_module(source_path: &Path) -> Result<()> {
+    remove_legacy_generated_module_using(source_path, |path| fs::remove_file(path))
+}
+
+fn remove_legacy_generated_module_using(
+    source_path: &Path,
+    remove_file: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> Result<()> {
     const GENERATED_MARKER: &str = "// Generated by `cargo bake --regenerate`; do not edit.";
 
     let Some(source_directory) = source_path.parent() else {
@@ -425,19 +491,26 @@ fn remove_legacy_generated_module(source_path: &Path) -> Result<()> {
     let legacy_directory = source_directory.join("__bake_generated_tasks");
     let legacy_source = legacy_directory.join("mod.rs");
     if fs::read_to_string(&legacy_source).is_ok_and(|source| source.starts_with(GENERATED_MARKER)) {
-        fs::remove_file(legacy_source)?;
+        remove_file(&legacy_source)?;
         let _ = fs::remove_dir(legacy_directory);
     }
     Ok(())
 }
 
 fn bootstrap_task_package(location: &Location) -> Result<()> {
+    bootstrap_task_package_using(location, |path| path.canonicalize())
+}
+
+fn bootstrap_task_package_using(
+    location: &Location,
+    canonicalize: impl Fn(&Path) -> std::io::Result<PathBuf>,
+) -> Result<()> {
     let task_directory = location
         .task_manifest
         .parent()
         .ok_or("task manifest has no parent directory")?;
     fs::create_dir_all(task_directory)?;
-    let task_directory = task_directory.canonicalize()?;
+    let task_directory = canonicalize(task_directory)?;
 
     let member = task_directory
         .strip_prefix(&location.workspace_root)
@@ -651,6 +724,87 @@ mod tests {
     }
 
     #[test]
+    fn locates_from_metadata_and_reports_metadata_path_errors() {
+        let directory = tempdir().unwrap();
+        let manifest = directory.path().join("package/Cargo.toml");
+        write(
+            &manifest,
+            "[package]\nname = \"example\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        );
+        let manifest = manifest.canonicalize().unwrap();
+        let package = |metadata| Package {
+            name: "example".to_owned(),
+            manifest_path: manifest.clone(),
+            metadata,
+            default_run: None,
+            targets: vec![],
+            dependencies: vec![],
+        };
+
+        assert!(
+            locate_with_metadata(
+                manifest.clone(),
+                Metadata {
+                    workspace_root: directory.path().to_path_buf(),
+                    metadata: Value::Null,
+                    packages: vec![package(serde_json::json!({"bake": {"manifest": ""}}))],
+                },
+            )
+            .is_err()
+        );
+
+        assert!(
+            locate_with_metadata_using(
+                manifest.clone(),
+                Metadata {
+                    workspace_root: directory.path().to_path_buf(),
+                    metadata: Value::Null,
+                    packages: vec![],
+                },
+                |_| Err(std::io::Error::other("workspace disappeared")),
+            )
+            .is_err()
+        );
+
+        let package_root = manifest.parent().unwrap().to_path_buf();
+        assert!(
+            locate_with_metadata_using(
+                manifest.clone(),
+                Metadata {
+                    workspace_root: directory.path().to_path_buf(),
+                    metadata: Value::Null,
+                    packages: vec![package(
+                        serde_json::json!({"bake": {"manifest": "tasks/Cargo.toml"}})
+                    )],
+                },
+                |path| {
+                    if path == package_root {
+                        Err(std::io::Error::other("package root disappeared"))
+                    } else {
+                        path.canonicalize()
+                    }
+                },
+            )
+            .is_err()
+        );
+
+        let task_manifest = directory.path().join("tasks/Cargo.toml");
+        write(&task_manifest, "not a task package yet\n");
+        let location = Location {
+            root: directory.path().to_path_buf(),
+            workspace_root: directory.path().to_path_buf(),
+            workspace_manifest: directory.path().join("Cargo.toml"),
+            task_manifest,
+        };
+        assert!(
+            Project::regenerate_at_location(&location, &Options::default(), |_| {
+                Err(std::io::Error::other("task manifest disappeared"))
+            })
+            .is_err()
+        );
+    }
+
+    #[test]
     fn locates_a_workspace_manifest_from_package_and_ancestor_metadata() {
         let directory = tempdir().unwrap();
         let root = directory.path();
@@ -659,7 +813,9 @@ mod tests {
 
         let root_document = document("[workspace]\n");
         assert_eq!(
-            workspace_manifest_for(&workspace_manifest, &root_document).unwrap(),
+            workspace_manifest_for(&workspace_manifest, &root_document)
+                .unwrap()
+                .0,
             workspace_manifest
         );
 
@@ -672,7 +828,9 @@ mod tests {
             "[package]\nname = \"member\"\nversion = \"0.1.0\"\nedition = \"2024\"\nworkspace = \"..\"\n",
         );
         assert_eq!(
-            workspace_manifest_for(&package_manifest, &package_document).unwrap(),
+            workspace_manifest_for(&package_manifest, &package_document)
+                .unwrap()
+                .0,
             workspace_manifest.canonicalize().unwrap()
         );
 
@@ -680,6 +838,33 @@ mod tests {
             "[package]\nname = \"member\"\nversion = \"0.1.0\"\nedition = \"2024\"\nworkspace = \"../missing\"\n",
         );
         assert!(workspace_manifest_for(&package_manifest, &missing_workspace_document).is_err());
+
+        let unreadable_workspace = tempdir().unwrap();
+        fs::create_dir_all(unreadable_workspace.path().join("Cargo.toml")).unwrap();
+        let member_manifest = unreadable_workspace.path().join("member/Cargo.toml");
+        write(&member_manifest, "[package]\nname = \"member\"\n");
+        assert!(
+            workspace_manifest_for(
+                &member_manifest,
+                &document("[package]\nworkspace = \"..\"\n"),
+            )
+            .is_err()
+        );
+
+        let malformed_workspace = tempdir().unwrap();
+        write(
+            &malformed_workspace.path().join("Cargo.toml"),
+            "[workspace\n",
+        );
+        let member_manifest = malformed_workspace.path().join("member/Cargo.toml");
+        write(&member_manifest, "[package]\nname = \"member\"\n");
+        assert!(
+            workspace_manifest_for(
+                &member_manifest,
+                &document("[package]\nworkspace = \"..\"\n"),
+            )
+            .is_err()
+        );
 
         let nested_manifest = root.join("member/nested/Cargo.toml");
         write(
@@ -689,7 +874,9 @@ mod tests {
         let nested_document =
             document("[package]\nname = \"nested\"\nversion = \"0.1.0\"\nedition = \"2024\"\n");
         assert_eq!(
-            workspace_manifest_for(&nested_manifest, &nested_document).unwrap(),
+            workspace_manifest_for(&nested_manifest, &nested_document)
+                .unwrap()
+                .0,
             workspace_manifest.canonicalize().unwrap()
         );
     }
@@ -706,13 +893,65 @@ mod tests {
             document("[package]\nname = \"member\"\nversion = \"0.1.0\"\nedition = \"2024\"\n");
         write(&directory.path().join("Cargo.toml"), "[workspace\n");
         assert_eq!(
-            workspace_manifest_for(&manifest, &package_document).unwrap(),
+            workspace_manifest_for(&manifest, &package_document)
+                .unwrap()
+                .0,
             manifest
         );
 
         let package_workspace = document("[package]\nworkspace = \"..\"\n");
         assert!(workspace_manifest_for(Path::new("/"), &package_workspace).is_err());
         assert!(workspace_manifest_for(Path::new("/"), &DocumentMut::new()).is_err());
+
+        let workspace = directory.path().join("Cargo.toml");
+        write(&workspace, "[workspace]\n");
+        let nested = directory.path().join("nested/Cargo.toml");
+        write(&nested, "[package]\nname = \"nested\"\n");
+        let nested_document = document("[package]\nname = \"nested\"\n");
+        assert!(
+            workspace_manifest_for_using(&nested, &nested_document, |_| {
+                Err(std::io::Error::other("workspace disappeared"))
+            })
+            .is_err()
+        );
+
+        let calls = std::cell::Cell::new(0);
+        assert!(
+            locate_from_manifest_using(&workspace, |_| {
+                let call = calls.get();
+                calls.set(call + 1);
+                if call == 1 {
+                    Err(std::io::Error::other("package root disappeared"))
+                } else {
+                    Ok(directory.path().to_path_buf())
+                }
+            })
+            .is_err()
+        );
+        assert!(
+            locate_from_manifest_using(&workspace, |_| {
+                Err(std::io::Error::other("workspace root disappeared"))
+            })
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn reports_metadata_process_and_response_errors() {
+        let directory = tempdir().unwrap();
+        let options = Options::default();
+        assert!(metadata_with_command(Path::new("/"), &options, cargo()).is_err());
+
+        let missing_cargo = directory.path().join("missing-cargo");
+        assert!(
+            metadata_with_command(
+                &directory.path().join("Cargo.toml"),
+                &options,
+                std::process::Command::new(missing_cargo),
+            )
+            .is_err()
+        );
+        assert!(parse_metadata(b"not json").is_err());
     }
 
     #[test]
@@ -796,6 +1035,120 @@ mod tests {
         assert!(locate_from_manifest(&manifest).is_err());
 
         assert!(locate_from_manifest(&manifest.with_file_name("missing.toml")).is_err());
+
+        write(&manifest, "[workspace\n");
+        assert!(locate_from_manifest(&manifest).is_err());
+    }
+
+    #[test]
+    fn reports_project_manifest_and_task_package_errors() {
+        let directory = tempdir().unwrap();
+        let mut options = Options {
+            manifest: Some(PathBuf::from("missing.toml")),
+            ..Options::default()
+        };
+        assert!(Project::locate(directory.path(), &options).is_err());
+
+        write(
+            &directory.path().join("Cargo.toml"),
+            "[package]\nname = \"example\"\nversion = \"0.1.0\"\nedition = \"2024\"\n[package.metadata.bake]\nmanifest = \"\"\n",
+        );
+        options.manifest = None;
+        assert!(Project::locate(directory.path(), &options).is_err());
+
+        let workspace = tempdir().unwrap();
+        write(
+            &workspace.path().join("Cargo.toml"),
+            "[workspace]\nmembers = []\n[workspace.metadata.bake]\nmanifest = \"Cargo.toml\"\n",
+        );
+        assert!(Project::discover(workspace.path(), &Options::default()).is_err());
+
+        let library_workspace = tempdir().unwrap();
+        write(
+            &library_workspace.path().join("Cargo.toml"),
+            "[workspace]\nmembers = [\"tasks\"]\n[workspace.metadata.bake]\nmanifest = \"tasks/Cargo.toml\"\n",
+        );
+        write(
+            &library_workspace.path().join("tasks/Cargo.toml"),
+            "[package]\nname = \"task-library\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        );
+        write(
+            &library_workspace.path().join("tasks/src/lib.rs"),
+            "// A task package without a binary.\n",
+        );
+        assert!(Project::discover(library_workspace.path(), &Options::default()).is_err());
+        assert!(Project::regenerate(library_workspace.path(), &Options::default()).is_err());
+
+        let invalid_task_workspace = tempdir().unwrap();
+        write(
+            &invalid_task_workspace.path().join("Cargo.toml"),
+            "[workspace]\nmembers = []\n[workspace.metadata.bake]\nmanifest = \"tasks/Cargo.toml\"\n",
+        );
+        write(
+            &invalid_task_workspace.path().join("tasks/Cargo.toml"),
+            "[package\n",
+        );
+        assert!(Project::discover(invalid_task_workspace.path(), &Options::default()).is_err());
+
+        let missing_package_workspace = tempdir().unwrap();
+        write(
+            &missing_package_workspace.path().join("Cargo.toml"),
+            "[workspace]\nmembers = []\n[workspace.metadata.bake]\nmanifest = \"Cargo.toml\"\n",
+        );
+        assert!(
+            Project::regenerate(missing_package_workspace.path(), &Options::default()).is_err()
+        );
+
+        let blocked_task_workspace = tempdir().unwrap();
+        write(
+            &blocked_task_workspace.path().join("Cargo.toml"),
+            "[workspace]\nmembers = []\n[workspace.metadata.bake]\nmanifest = \"tasks/Cargo.toml\"\n",
+        );
+        fs::write(
+            blocked_task_workspace.path().join("tasks"),
+            "not a directory",
+        )
+        .unwrap();
+        assert!(Project::regenerate(blocked_task_workspace.path(), &Options::default()).is_err());
+
+        let generated_module_workspace = tempdir().unwrap();
+        write(
+            &generated_module_workspace.path().join("Cargo.toml"),
+            "[workspace]\nmembers = [\"bake\"]\n[workspace.metadata.bake]\nmanifest = \"bake/Cargo.toml\"\n",
+        );
+        write(
+            &generated_module_workspace.path().join("bake/Cargo.toml"),
+            "[package]\nname = \"example-bake\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        );
+        write(
+            &generated_module_workspace.path().join("bake/src/main.rs"),
+            "fn main() {}\n",
+        );
+        fs::write(
+            generated_module_workspace
+                .path()
+                .join("bake/src/bake_generated_tasks"),
+            "not a directory",
+        )
+        .unwrap();
+        assert!(
+            Project::regenerate(generated_module_workspace.path(), &Options::default()).is_err()
+        );
+
+        let manual_module_workspace = tempdir().unwrap();
+        write(
+            &manual_module_workspace.path().join("Cargo.toml"),
+            "[workspace]\nmembers = [\"bake\"]\n[workspace.metadata.bake]\nmanifest = \"bake/Cargo.toml\"\n",
+        );
+        write(
+            &manual_module_workspace.path().join("bake/Cargo.toml"),
+            "[package]\nname = \"example-bake\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        );
+        write(
+            &manual_module_workspace.path().join("bake/src/main.rs"),
+            "mod bake_generated_tasks;\n",
+        );
+        assert!(Project::regenerate(manual_module_workspace.path(), &Options::default()).is_err());
     }
 
     #[test]
@@ -972,6 +1325,7 @@ mod tests {
     fn adds_migrates_and_validates_the_generated_module_declaration() {
         let directory = tempdir().unwrap();
         let source = directory.path().join("src/main.rs");
+        assert!(add_generated_module(&source).is_err());
         write(&source, "fn main() {}\n");
         add_generated_module(&source).unwrap();
         let generated = fs::read_to_string(&source).unwrap();
@@ -1013,6 +1367,28 @@ mod tests {
         );
         assert!(!legacy_module.exists());
 
+        let failed_legacy_source = directory.path().join("failed-legacy/main.rs");
+        write(
+            &failed_legacy_source,
+            "#[path = \"__bake_generated_tasks/mod.rs\"]\nmod __bake_generated_tasks;\n",
+        );
+        assert!(
+            add_generated_module_using(&failed_legacy_source, |_| {
+                Err("could not remove generated module".into())
+            })
+            .is_err()
+        );
+
+        let readonly_legacy_source = directory.path().join("readonly-legacy/main.rs");
+        write(
+            &readonly_legacy_source,
+            "#[path = \"__bake_generated_tasks/mod.rs\"]\nmod __bake_generated_tasks;\n",
+        );
+        let mut permissions = fs::metadata(&readonly_legacy_source).unwrap().permissions();
+        permissions.set_readonly(true);
+        fs::set_permissions(&readonly_legacy_source, permissions).unwrap();
+        assert!(add_generated_module(&readonly_legacy_source).is_err());
+
         let both_source = directory.path().join("both/main.rs");
         write(
             &both_source,
@@ -1050,6 +1426,17 @@ mod tests {
         write(&legacy_directory.join("keep.rs"), "fn keep() {}\n");
         remove_legacy_generated_module(&source).unwrap();
         assert!(legacy_directory.join("keep.rs").is_file());
+
+        write(
+            &legacy_directory.join("mod.rs"),
+            "// Generated by `cargo bake --regenerate`; do not edit.\n",
+        );
+        assert!(
+            remove_legacy_generated_module_using(&source, |_| {
+                Err(std::io::Error::other("file is locked"))
+            })
+            .is_err()
+        );
 
         remove_legacy_generated_module(Path::new("/")).unwrap();
     }
@@ -1126,6 +1513,50 @@ mod tests {
         };
 
         assert!(bootstrap_task_package(&location).is_err());
+
+        let no_manifest_parent = Location {
+            root: root.clone(),
+            workspace_root: root.clone(),
+            workspace_manifest: root.join("Cargo.toml"),
+            task_manifest: PathBuf::new(),
+        };
+        assert!(bootstrap_task_package(&no_manifest_parent).is_err());
+
+        let canonicalize_failure = Location {
+            root: root.clone(),
+            workspace_root: root.clone(),
+            workspace_manifest: root.join("Cargo.toml"),
+            task_manifest: root.join("canonicalize-failure/Cargo.toml"),
+        };
+        assert!(
+            bootstrap_task_package_using(&canonicalize_failure, |_| {
+                Err(std::io::Error::other("task directory disappeared"))
+            })
+            .is_err()
+        );
+
+        let missing_workspace_location = Location {
+            root: root.clone(),
+            workspace_root: root.clone(),
+            workspace_manifest: root.join("missing-workspace.toml"),
+            task_manifest: root.join("other-tasks/Cargo.toml"),
+        };
+        assert!(bootstrap_task_package(&missing_workspace_location).is_err());
+
+        let manifest_directory = root.join("manifest-directory");
+        write(
+            &manifest_directory.join("Cargo.toml"),
+            "[workspace]\nmembers = []\n",
+        );
+        let task_manifest = manifest_directory.join("bake/Cargo.toml");
+        fs::create_dir_all(&task_manifest).unwrap();
+        let manifest_location = Location {
+            root: manifest_directory.canonicalize().unwrap(),
+            workspace_root: manifest_directory.canonicalize().unwrap(),
+            workspace_manifest: manifest_directory.join("Cargo.toml"),
+            task_manifest,
+        };
+        assert!(bootstrap_task_package(&manifest_location).is_err());
     }
 
     #[test]
@@ -1187,6 +1618,16 @@ mod tests {
         assert!(add_workspace_member(&manifest, "bake").is_err());
 
         write(&manifest, "[workspace]\nmembers = \"not an array\"\n");
+        assert!(add_workspace_member(&manifest, "bake").is_err());
+
+        write(&manifest, "[workspace\n");
+        assert!(add_workspace_member(&manifest, "bake").is_err());
+        assert!(add_workspace_member(&directory.path().join("missing.toml"), "bake").is_err());
+
+        write(&manifest, "[package]\nname = \"root\"\n");
+        let mut permissions = fs::metadata(&manifest).unwrap().permissions();
+        permissions.set_readonly(true);
+        fs::set_permissions(&manifest, permissions).unwrap();
         assert!(add_workspace_member(&manifest, "bake").is_err());
     }
 }

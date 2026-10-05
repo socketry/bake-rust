@@ -82,7 +82,10 @@ fn inner_type<'a>(kind: &str, value: &'a Type) -> Option<&'a Type> {
     if arguments.args.len() != 1 {
         return None;
     }
-    match arguments.args.first()? {
+    let Some(argument) = arguments.args.first() else {
+        unreachable!("the single generic argument was checked above")
+    };
+    match argument {
         syn::GenericArgument::Type(value) => Some(value),
         _ => None,
     }

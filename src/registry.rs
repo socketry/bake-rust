@@ -232,12 +232,25 @@ impl Registry {
 
     /// Run the process command line and print its final result through `output`.
     pub fn run(self) -> Result<()> {
-        let tokens: Vec<_> = std::env::args_os()
+        self.run_with_process_environment(
+            std::env::args_os(),
+            std::env::var_os("BAKE_PROJECT_ROOT"),
+            std::env::current_dir,
+        )
+    }
+
+    fn run_with_process_environment(
+        self,
+        arguments: impl IntoIterator<Item = OsString>,
+        configured_root: Option<OsString>,
+        current_directory: fn() -> io::Result<PathBuf>,
+    ) -> Result<()> {
+        let tokens: Vec<_> = arguments
+            .into_iter()
             .skip(1)
             .map(task_argument)
             .collect::<Result<_>>()?;
-        let root =
-            root_from_environment(std::env::var_os("BAKE_PROJECT_ROOT"), std::env::current_dir)?;
+        let root = root_from_environment(configured_root, current_directory)?;
         self.run_with(root, &tokens, &mut io::stdout().lock())
     }
 
@@ -491,6 +504,17 @@ mod tests {
     #[test]
     fn run_prints_help_when_no_task_is_given() {
         assert!(Registry::new().run().is_ok());
+    }
+
+    #[test]
+    fn reports_project_root_discovery_errors() {
+        let error = Registry::new()
+            .run_with_process_environment([], None, || {
+                Err(io::Error::other("no current directory"))
+            })
+            .unwrap_err();
+
+        assert!(error.to_string().contains("no current directory"));
     }
 
     #[test]

@@ -27,9 +27,6 @@ jobs:
       - name: Run workspace tests with Bake
         if: runner.os != 'Windows'
         run: cargo bake --locked test
-      - name: Run workspace tests with Cargo on Windows
-        if: runner.os == 'Windows'
-        run: cargo test --workspace --locked
       - name: Exercise task discovery and invocation
         run: |
           cargo bake --locked --list
@@ -40,18 +37,27 @@ jobs:
           cargo bake --locked releases:notes v0.1.0
 
   coverage:
-    runs-on: ubuntu-latest
+    name: Coverage (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           components: clippy, llvm-tools-preview, rustfmt
+          # Isolate this source-installed tool from the old prebuilt-action cache.
+          cache-shared-key: coverage-cargo-install-v1
       - name: Install Bake launcher
         run: cargo install socketry-cargo-bake --locked
       - name: Install coverage tool
         run: cargo install cargo-llvm-cov --locked
       - run: cargo fmt --all -- --check
+        if: matrix.runner == 'ubuntu-latest'
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Run tests and require complete line coverage
+        if: matrix.runner == 'ubuntu-latest'
+      - name: Run tests and require complete source-region coverage
         run: cargo bake --locked test:coverage --all-targets true

@@ -74,6 +74,6 @@ settings. Do not rename, archive, transfer, or delete a repository without
 explicit approval, and do not disable issues, pull requests, or required checks
 without approval.
 
-The Cargo-specific release workflow, environment reviewers, and trusted
-publishing are covered in the
-[`socketry-project-releasing` skill](https://github.com/socketry/socketry-project-rust/blob/main/context/releasing.md).
+The `socketry-project-releasing` skill describes the standard Cargo release
+process and links to Bake Cargo task documentation for branch rulesets,
+crates.io environment reviewers, and trusted publishing.

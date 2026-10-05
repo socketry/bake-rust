@@ -82,7 +82,11 @@ fn prepare(
 }
 
 fn run() -> Result<()> {
-    Registry::discover()?.run()
+    run_registry(Registry::discover())
+}
+
+fn run_registry(registry: Result<Registry>) -> Result<()> {
+    registry?.run()
 }
 
 fn main() -> ExitCode {
@@ -128,6 +132,7 @@ mod tests {
 
     #[test]
     fn exercises_example_tasks_and_cargo_failures() {
+        assert!(run_registry(Err(Error::new("discovery failure"))).is_err());
         assert_eq!(greet("Sam".into(), false, vec![]).unwrap(), "Hello, Sam.");
         assert_eq!(
             greet("Sam".into(), true, vec!["tag".into()]).unwrap(),
@@ -174,6 +179,12 @@ mod tests {
 
         assert!(prepare(&mut context, "v0.1.0".into(), false).is_ok());
         assert!(prepare(&mut context, "v0.1.0".into(), true).is_ok());
+    }
+
+    #[test]
+    fn release_notes_require_a_version() {
+        let mut context = Registry::new().context(".");
+        assert!(notes(&mut context, &Arguments::default()).is_err());
     }
 
     #[test]

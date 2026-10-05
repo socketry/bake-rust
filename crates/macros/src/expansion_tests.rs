@@ -28,6 +28,7 @@ fn rejects_unsupported_signatures() {
         "fn example(#[bake(help)] value: String) {}",
         "fn example(#[bake(help = 42)] value: String) {}",
         "fn example(#[bake(input)] value: String) {}",
+        "fn example(#[bake(input)] value: Value<>) {}",
         "fn example(#[bake(input)] first: Value, #[bake(input)] second: Value) {}",
         "fn example(#[bake(input, named)] value: Value) {}",
         "fn example(#[bake(positional)] value: String) {}",
@@ -240,4 +241,17 @@ fn expands_context_parameters_by_convention() {
 
     assert!(output.contains("Task :: new"));
     assert!(!output.contains("Parameter :: new"));
+
+    let named_context = expand(
+        quote!(),
+        syn::parse_quote! {
+            fn example(context: String) -> Result<()> {
+                let _ = context;
+                Ok(())
+            }
+        },
+    )
+    .unwrap()
+    .to_string();
+    assert!(named_context.contains("Parameter :: new :: < String >"));
 }

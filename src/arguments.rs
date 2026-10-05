@@ -237,5 +237,13 @@ mod tests {
         arguments.insert(&repeated, "3").unwrap();
         assert_eq!(arguments.repeated::<usize>("count").unwrap(), vec![1, 2, 3]);
         assert!(arguments.insert(&repeated, "not a number").is_err());
+
+        assert!(
+            Arguments::extract(
+                &[Parameter::new::<usize>("count")],
+                &["not a number".to_owned()],
+            )
+            .is_err()
+        );
     }
 }
