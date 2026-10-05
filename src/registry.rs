@@ -568,11 +568,36 @@ mod tests {
         assert_eq!(task_argument("inspect".into()).unwrap(), "inspect");
 
         #[cfg(unix)]
-        {
+        let invalid = {
             use std::os::unix::ffi::OsStringExt;
+            OsString::from_vec(vec![0xff])
+        };
 
-            assert!(task_argument(OsString::from_vec(vec![0xff])).is_err());
-        }
+        #[cfg(windows)]
+        let invalid = {
+            use std::os::windows::ffi::OsStringExt;
+            OsString::from_wide(&[0xd800])
+        };
+
+        assert!(task_argument(invalid.clone()).is_err());
+        assert!(
+            Registry::new()
+                .run_with_process_environment(
+                    [OsString::from("bake"), invalid],
+                    None,
+                    std::env::current_dir,
+                )
+                .is_err()
+        );
+
+        let error = Registry::new()
+            .run_with_process_environment(
+                [OsString::from("bake"), OsString::from("missing")],
+                None,
+                || Ok(PathBuf::from(".")),
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains("unknown task"));
     }
 
     #[test]

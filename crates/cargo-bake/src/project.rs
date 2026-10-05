@@ -1211,6 +1211,46 @@ mod tests {
     }
 
     #[test]
+    fn regenerates_a_missing_task_package_and_reports_metadata_failures() {
+        let directory = tempdir().unwrap();
+        let root = directory.path();
+        let workspace_manifest = root.join("Cargo.toml");
+        write(&workspace_manifest, "[workspace]\nmembers = []\n");
+        let location = Location {
+            root: root.canonicalize().unwrap(),
+            workspace_root: root.canonicalize().unwrap(),
+            workspace_manifest,
+            task_manifest: root.join("bake/Cargo.toml"),
+        };
+
+        Project::regenerate_at_location(&location, &Options::default(), |path| path.canonicalize())
+            .unwrap();
+        assert!(location.task_manifest.is_file());
+
+        let invalid_directory = tempdir().unwrap();
+        let invalid_root = invalid_directory.path();
+        let invalid_workspace_manifest = invalid_root.join("Cargo.toml");
+        write(
+            &invalid_workspace_manifest,
+            "[workspace]\nmembers = [\"bake\"]\n",
+        );
+        let invalid_manifest = invalid_root.join("bake/Cargo.toml");
+        write(&invalid_manifest, "[package\n");
+        let invalid_location = Location {
+            root: invalid_root.canonicalize().unwrap(),
+            workspace_root: invalid_root.canonicalize().unwrap(),
+            workspace_manifest: invalid_workspace_manifest,
+            task_manifest: invalid_manifest,
+        };
+
+        assert!(
+            Project::regenerate_at_location(&invalid_location, &Options::default(), |path| path
+                .canonicalize(),)
+            .is_err()
+        );
+    }
+
+    #[test]
     fn selects_the_requested_binary_or_requires_one_unambiguous_binary() {
         let directory = tempdir().unwrap();
         let single = package(

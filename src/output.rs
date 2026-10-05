@@ -156,14 +156,27 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
     #[test]
     fn non_utf8_file_extensions_do_not_select_a_format() {
-        use std::os::unix::ffi::OsStringExt;
-
-        let path = PathBuf::from(std::ffi::OsString::from_vec(vec![
-            b'n', b'o', b't', b'e', b'.', 0xff,
-        ]));
+        #[cfg(unix)]
+        let path = {
+            use std::os::unix::ffi::OsStringExt;
+            PathBuf::from(std::ffi::OsString::from_vec(vec![
+                b'n', b'o', b't', b'e', b'.', 0xff,
+            ]))
+        };
+        #[cfg(windows)]
+        let path = {
+            use std::os::windows::ffi::OsStringExt;
+            PathBuf::from(std::ffi::OsString::from_wide(&[
+                b'n' as u16,
+                b'o' as u16,
+                b't' as u16,
+                b'e' as u16,
+                b'.' as u16,
+                0xd800,
+            ]))
+        };
         assert_eq!(inferred_format(&path), None);
     }
 
