@@ -3,7 +3,6 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-#[cfg(unix)]
 use tempfile::TempDir;
 
 fn root() -> PathBuf {
@@ -13,7 +12,6 @@ fn root() -> PathBuf {
         .to_path_buf()
 }
 
-#[cfg(unix)]
 fn release_section() -> (String, String) {
     let releases = std::fs::read_to_string(root().join("releases.md")).unwrap();
     let mut heading = None;
@@ -92,45 +90,60 @@ fn default_registry_exposes_the_builtin_tasks() {
     }
 }
 
-#[cfg(unix)]
-fn fake_cargo(directory: &TempDir, exit_code: u8) -> PathBuf {
-    use std::os::unix::fs::PermissionsExt;
-
-    let path = directory.path().join("fake-cargo");
+fn fake_cargo(directory: &TempDir) -> PathBuf {
+    let source = directory.path().join("fake-cargo.rs");
+    let path = directory.path().join(if cfg!(windows) {
+        "fake-cargo.exe"
+    } else {
+        "fake-cargo"
+    });
     std::fs::write(
-        &path,
-        format!(
-            "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$BAKE_TEST_CARGO_ARGUMENTS\"\nexit {exit_code}\n"
-        ),
+        &source,
+        r#"
+fn main() {
+    let arguments = std::env::args().skip(1).collect::<Vec<_>>().join("\n") + "\n";
+    std::fs::write(std::env::var_os("BAKE_TEST_CARGO_ARGUMENTS").unwrap(), arguments).unwrap();
+    let exit_code: i32 = std::env::var("BAKE_TEST_CARGO_EXIT_CODE").unwrap().parse().unwrap();
+    std::process::exit(exit_code);
+}
+"#,
     )
     .unwrap();
-    let mut permissions = std::fs::metadata(&path).unwrap().permissions();
-    permissions.set_mode(0o755);
-    std::fs::set_permissions(&path, permissions).unwrap();
+    let output = Command::new("rustc")
+        .args(["--edition=2024", "--crate-name=fake_cargo"])
+        .arg(&source)
+        .arg("-o")
+        .arg(&path)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "failed to compile fake cargo: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     path
 }
 
-#[cfg(unix)]
-fn run_with_cargo(arguments: &[&str], cargo: &Path, log: &Path) -> Output {
+fn run_with_cargo(arguments: &[&str], cargo: &Path, log: &Path, exit_code: u8) -> Output {
     Command::new(env!("CARGO_BIN_EXE_bake-rust-tasks"))
         .args(arguments)
         .current_dir(root())
         .env("BAKE_PROJECT_ROOT", root())
         .env("CARGO", cargo)
         .env("BAKE_TEST_CARGO_ARGUMENTS", log)
+        .env("BAKE_TEST_CARGO_EXIT_CODE", exit_code.to_string())
         .output()
         .unwrap()
 }
 
-#[cfg(unix)]
 #[test]
 fn checks_workspace_with_optional_offline_mode() {
     let directory = tempfile::tempdir().unwrap();
-    let cargo = fake_cargo(&directory, 0);
+    let cargo = fake_cargo(&directory);
     let arguments = directory.path().join("arguments.txt");
 
     assert!(
-        run_with_cargo(&["build:check"], &cargo, &arguments)
+        run_with_cargo(&["build:check"], &cargo, &arguments, 0)
             .status
             .success()
     );
@@ -140,7 +153,7 @@ fn checks_workspace_with_optional_offline_mode() {
     );
 
     assert!(
-        run_with_cargo(&["build:check", "--offline", "true"], &cargo, &arguments)
+        run_with_cargo(&["build:check", "--offline", "true"], &cargo, &arguments, 0)
             .status
             .success()
     );
@@ -150,15 +163,14 @@ fn checks_workspace_with_optional_offline_mode() {
     );
 }
 
-#[cfg(unix)]
 #[test]
 fn propagates_check_failures_and_runs_release_notes_hook() {
     let directory = tempfile::tempdir().unwrap();
-    let cargo = fake_cargo(&directory, 7);
+    let cargo = fake_cargo(&directory);
     let arguments = directory.path().join("arguments.txt");
     let (heading, note) = release_section();
 
-    let output = run_with_cargo(&["build:check"], &cargo, &arguments);
+    let output = run_with_cargo(&["build:check"], &cargo, &arguments, 7);
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("cargo check failed"));
 
@@ -166,26 +178,39 @@ fn propagates_check_failures_and_runs_release_notes_hook() {
         &["release:prepare", &heading, "--offline", "true"],
         &cargo,
         &arguments,
+        7,
     );
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("cargo check failed"));
 
-    let cargo = fake_cargo(&directory, 0);
+    let cargo = fake_cargo(&directory);
     let output = stdout(run_with_cargo(
         &["release:prepare", &heading, "--offline", "true"],
         &cargo,
         &arguments,
+        0,
     ));
     assert!(output.contains(&note));
 }
 
-#[cfg(unix)]
+fn non_utf8_argument() -> std::ffi::OsString {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStringExt;
+        std::ffi::OsString::from_vec(vec![0xff])
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStringExt;
+        std::ffi::OsString::from_wide(&[0xd800])
+    }
+}
+
 #[test]
 fn rejects_non_utf8_arguments() {
-    use std::os::unix::ffi::OsStrExt;
-
     let output = Command::new(env!("CARGO_BIN_EXE_bake-rust-tasks"))
-        .arg(std::ffi::OsStr::from_bytes(b"\xff"))
+        .arg(non_utf8_argument())
         .current_dir(root())
         .env("BAKE_PROJECT_ROOT", root())
         .output()

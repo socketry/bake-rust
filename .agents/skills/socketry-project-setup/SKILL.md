@@ -1,12 +1,13 @@
 ---
 name: socketry-project-setup
-description: Set up a new or existing Rust repository for a Socketry project, including its Cargo layout, shared Bake tasks, agent context, tests, and GitHub workflows. Use when creating a crate repository or bringing one into the standard project structure.
+description: Bootstrap a Rust repository with Socketry layout, Bake tasks, agent context, tests, and workflows. Use for a new repository or initial setup.
 ---
 
 # Set Up a Rust Repository
 
-Use this skill to start a Rust repository with the shared Socketry conventions,
-agent context, and release tasks.
+Use this skill to bootstrap a new Rust repository or add its initial shared
+Socketry tooling. For an audit of an established repository, use the
+`socketry-project-update` skill.
 
 ## Create the repository
 
@@ -38,7 +39,7 @@ minimal binary. Add this dependency under the existing `[dependencies]` table in
 `bake/Cargo.toml`:
 
 ```toml
-socketry-project = "0.2"
+socketry-project = "0.3"
 ```
 
 Run regeneration again to link its task registrations:
@@ -58,55 +59,39 @@ The `socketry-project` dependency makes the shared tasks available to the
 private Bake binary. It also registers `cargo:after_version_bump`, which updates
 `license.md`, `releases.md`, and generated sections in `readme.md` after a
 version change.
-It bundles the standard `test` and `test:external` task providers as well.
 Keep task tooling out of unrelated published libraries. Consumer projects
 should depend on `socketry-project` from their private `bake/` package.
 
-Install the project's agent context:
+## Agent context
 
-```sh
-cargo bake agent:context:install
-```
-
-This installs ordinary context guides under `.agents/context/`, installs
-dependency-provided skills under `.agents/skills/`, and updates `agents.md`
-with links to ordinary context. Read that index and inspect applicable skills.
-Add `--package socketry-project` to install only this crate's context and
-skills. See the Agent Context guide provided by `bake-agent-context` for how to
-organize shared and project-only guidance.
+Follow the [Agent Context section in `readme.md`](../readme.md#agent-context)
+to install and discover shared context and skills. Follow
+[Conventions](conventions.md#source-and-documentation) for where to keep
+package guidance and project-only instructions. The `bake-agent-context`
+guide documents installer behavior and options.
 
 ## Set up GitHub
 
 Configure repository metadata, collaboration features, pull request defaults,
 and branch protection using the `socketry-project-github-repository` skill.
 Generate the Cargo workflow with `cargo:setup:workflow`; follow the
-[`socketry-project-releasing` skill](https://github.com/socketry/socketry-project-rust/blob/main/context/releasing.md)
-before applying rulesets, environment reviewers, or crates.io trusted
-publishing.
+`socketry-project-releasing` skill before applying rulesets, environment
+reviewers, or crates.io trusted publishing. It links to the Bake Cargo Readme
+for task-specific details.
 
-## Standard workflows
+## Test workflows
 
-Keep `.github/workflows/test.yml` for local workspace tests. When
-`bake-test-rust` is linked, install the Cargo launcher and run
-`cargo bake --locked test` so the optional `test:before` hook also runs.
-Otherwise use `cargo test --workspace --locked`. Add platform or feature
-matrix entries when the project needs them.
-
-List selected downstream projects under
-`[workspace.metadata.bake.test.external]` in the root `Cargo.toml`. Add
-`.github/workflows/external.yml` only when that list is non-empty, and run
-`cargo bake --locked test:external` when `bake-test-rust` is linked. The task
-keeps checkouts under `external/` and applies local workspace crates as Cargo
-patches so downstream tests exercise the source being developed.
+Use the `socketry-project-testing` skill for organization-wide testing
+expectations. Consult the installed `bake-test-rust` context for canonical
+`test.yml` and optional `external.yml` workflows, task setup, coverage options,
+and downstream test configuration.
 
 Use `cargo:setup:workflow` from `bake-cargo` to generate
 `.github/workflows/publish.yml`. That workflow checks a release candidate on
 pull requests, publishes after merge through the configured `crates-io`
 environment, and then creates or updates the matching GitHub Release from
-`releases.md`. See the [`socketry-project-releasing` skill](https://github.com/socketry/socketry-project-rust/blob/main/context/releasing.md)
-for trusted publishing and repository setup. See the Rust Testing context
-guide provided by `socketry-project` for test workflow details and optional
-downstream compatibility workflows.
+`releases.md`. Follow the `socketry-project-releasing` skill for the release
+process and `bake-test-rust` context for workflow and task details.
 
 ## Work on the project
 

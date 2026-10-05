@@ -232,12 +232,25 @@ impl Registry {
 
     /// Run the process command line and print its final result through `output`.
     pub fn run(self) -> Result<()> {
-        let tokens: Vec<_> = std::env::args_os()
+        self.run_with_process_environment(
+            std::env::args_os(),
+            std::env::var_os("BAKE_PROJECT_ROOT"),
+            std::env::current_dir,
+        )
+    }
+
+    fn run_with_process_environment(
+        self,
+        arguments: impl IntoIterator<Item = OsString>,
+        configured_root: Option<OsString>,
+        current_directory: fn() -> io::Result<PathBuf>,
+    ) -> Result<()> {
+        let tokens: Vec<_> = arguments
+            .into_iter()
             .skip(1)
             .map(task_argument)
             .collect::<Result<_>>()?;
-        let root =
-            root_from_environment(std::env::var_os("BAKE_PROJECT_ROOT"), std::env::current_dir)?;
+        let root = root_from_environment(configured_root, current_directory)?;
         self.run_with(root, &tokens, &mut io::stdout().lock())
     }
 
@@ -494,6 +507,17 @@ mod tests {
     }
 
     #[test]
+    fn reports_project_root_discovery_errors() {
+        let error = Registry::new()
+            .run_with_process_environment([], None, || {
+                Err(io::Error::other("no current directory"))
+            })
+            .unwrap_err();
+
+        assert!(error.to_string().contains("no current directory"));
+    }
+
+    #[test]
     fn runs_path_root_commands_and_reports_unknown_help_tasks() {
         let mut registry = Registry::new();
         registry.register(inspection_task()).unwrap();
@@ -544,11 +568,36 @@ mod tests {
         assert_eq!(task_argument("inspect".into()).unwrap(), "inspect");
 
         #[cfg(unix)]
-        {
+        let invalid = {
             use std::os::unix::ffi::OsStringExt;
+            OsString::from_vec(vec![0xff])
+        };
 
-            assert!(task_argument(OsString::from_vec(vec![0xff])).is_err());
-        }
+        #[cfg(windows)]
+        let invalid = {
+            use std::os::windows::ffi::OsStringExt;
+            OsString::from_wide(&[0xd800])
+        };
+
+        assert!(task_argument(invalid.clone()).is_err());
+        assert!(
+            Registry::new()
+                .run_with_process_environment(
+                    [OsString::from("bake"), invalid],
+                    None,
+                    std::env::current_dir,
+                )
+                .is_err()
+        );
+
+        let error = Registry::new()
+            .run_with_process_environment(
+                [OsString::from("bake"), OsString::from("missing")],
+                None,
+                || Ok(PathBuf::from(".")),
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains("unknown task"));
     }
 
     #[test]

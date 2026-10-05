@@ -49,16 +49,16 @@ fn format_value(value: &Value, format: Format) -> Result<String> {
         Format::Raw => match value {
             Value::String(text) => text.clone(),
             Value::Null => String::new(),
-            value => serde_json::to_string_pretty(value)?,
+            value => pretty_json(value),
         },
-        Format::Json => serde_json::to_string_pretty(value)?,
+        Format::Json => pretty_json(value),
         Format::Ndjson => {
             let Value::Array(values) = value else {
                 return Err(Error::new("ndjson output requires an array result"));
             };
             let mut output = String::new();
             for value in values {
-                output.push_str(&serde_json::to_string(value)?);
+                output.push_str(&compact_json(value));
                 output.push('\n');
             }
             return Ok(output);
@@ -69,6 +69,16 @@ fn format_value(value: &Value, format: Format) -> Result<String> {
         output.push('\n');
     }
     Ok(output)
+}
+
+fn pretty_json(value: &Value) -> String {
+    serde_json::to_string_pretty(value)
+        .unwrap_or_else(|error| unreachable!("JSON values always serialize: {error}"))
+}
+
+fn compact_json(value: &Value) -> String {
+    serde_json::to_string(value)
+        .unwrap_or_else(|error| unreachable!("JSON values always serialize: {error}"))
 }
 
 fn inferred_format(file: &Path) -> Option<Format> {
@@ -138,16 +148,35 @@ mod tests {
     fn unknown_file_extensions_do_not_select_a_format() {
         assert_eq!(inferred_format(Path::new("releases.md")), None);
         assert_eq!(inferred_format(Path::new("notes.csv")), None);
+        assert_eq!(inferred_format(Path::new("notes.txt")), Some(Format::Raw));
+        assert_eq!(inferred_format(Path::new("notes.text")), Some(Format::Raw));
+        assert_eq!(
+            inferred_format(Path::new("notes.ndjson")),
+            Some(Format::Ndjson)
+        );
     }
 
-    #[cfg(unix)]
     #[test]
     fn non_utf8_file_extensions_do_not_select_a_format() {
-        use std::os::unix::ffi::OsStringExt;
-
-        let path = PathBuf::from(std::ffi::OsString::from_vec(vec![
-            b'n', b'o', b't', b'e', b'.', 0xff,
-        ]));
+        #[cfg(unix)]
+        let path = {
+            use std::os::unix::ffi::OsStringExt;
+            PathBuf::from(std::ffi::OsString::from_vec(vec![
+                b'n', b'o', b't', b'e', b'.', 0xff,
+            ]))
+        };
+        #[cfg(windows)]
+        let path = {
+            use std::os::windows::ffi::OsStringExt;
+            PathBuf::from(std::ffi::OsString::from_wide(&[
+                b'n' as u16,
+                b'o' as u16,
+                b't' as u16,
+                b'e' as u16,
+                b'.' as u16,
+                0xd800,
+            ]))
+        };
         assert_eq!(inferred_format(&path), None);
     }
 
