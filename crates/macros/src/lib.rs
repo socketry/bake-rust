@@ -28,6 +28,7 @@ fn expand_or_compile_error(
 struct ParameterOptions {
     default: Option<Expr>,
     named: bool,
+    positional: bool,
     context: bool,
     input: bool,
     help: Option<LitStr>,
@@ -49,6 +50,8 @@ fn options(attributes: &mut Vec<Attribute>) -> syn::Result<ParameterOptions> {
                 options.default = Some(meta.value()?.parse()?);
             } else if meta.path.is_ident("named") {
                 options.named = true;
+            } else if meta.path.is_ident("positional") {
+                options.positional = true;
             } else if meta.path.is_ident("context") {
                 options.context = true;
             } else if meta.path.is_ident("input") {
@@ -56,7 +59,9 @@ fn options(attributes: &mut Vec<Attribute>) -> syn::Result<ParameterOptions> {
             } else if meta.path.is_ident("help") {
                 options.help = Some(meta.value()?.parse()?);
             } else {
-                return Err(meta.error("expected default, named, context, input, or help"));
+                return Err(
+                    meta.error("expected default, named, positional, context, input, or help")
+                );
             }
             Ok(())
         })?;
@@ -170,6 +175,7 @@ fn expand(
     let resolved_name = format_ident!("__BAKE_TASK_NAME", span = proc_macro2::Span::mixed_site());
     let mut has_context = false;
     let mut has_input = false;
+    let mut has_positional_variadic = false;
     for input in &mut function.sig.inputs {
         let FnArg::Typed(argument) = input else {
             return Err(syn::Error::new_spanned(
@@ -203,6 +209,7 @@ fn expand(
                 || has_input
                 || settings.default.is_some()
                 || settings.named
+                || settings.positional
                 || settings.context
                 || settings.help.is_some()
             {
@@ -224,6 +231,7 @@ fn expand(
             if has_context
                 || settings.default.is_some()
                 || settings.named
+                || settings.positional
                 || settings.help.is_some()
                 || settings.input
             {
@@ -244,6 +252,32 @@ fn expand(
         }
         let optional_type = inner_type("Option", parameter_type);
         let repeated_type = inner_type("Vec", parameter_type);
+        if settings.positional && repeated_type.is_none() {
+            return Err(syn::Error::new_spanned(
+                parameter_type,
+                "#[bake(positional)] requires a Vec<T> parameter",
+            ));
+        }
+        if settings.positional && settings.named {
+            return Err(syn::Error::new_spanned(
+                argument,
+                "a positional variadic parameter cannot also be named",
+            ));
+        }
+        let is_positional_parameter = settings.positional
+            || (!settings.named
+                && settings.default.is_none()
+                && optional_type.is_none()
+                && repeated_type.is_none());
+        if has_positional_variadic && is_positional_parameter {
+            return Err(syn::Error::new_spanned(
+                argument,
+                "a positional variadic parameter must be the last positional argument",
+            ));
+        }
+        if settings.positional {
+            has_positional_variadic = true;
+        }
         if settings.default.is_some() && (optional_type.is_some() || repeated_type.is_some()) {
             return Err(syn::Error::new_spanned(
                 parameter_type,
@@ -256,7 +290,11 @@ fn expand(
             parameter = quote!(#parameter.named().optional());
             quote!(#invocation_arguments.optional::<#parsed_type>(#parameter_name)?)
         } else if repeated_type.is_some() {
-            parameter = quote!(#parameter.repeated());
+            parameter = if settings.positional {
+                quote!(#parameter.variadic())
+            } else {
+                quote!(#parameter.repeated())
+            };
             quote!(#invocation_arguments.repeated::<#parsed_type>(#parameter_name)?)
         } else if let Some(default) = &settings.default {
             let description = quote!(#default).to_string();

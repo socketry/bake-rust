@@ -55,6 +55,9 @@ registered tasks are linked into the binary.
   output task returns that result after writing it, so later tasks can reuse it.
 - Supplied values are validated before execution, then parsed by generated adapters.
   Default expressions run at invocation time.
+- Required scalars are positional; `Option` and `Vec` are named by default. The
+  opt-in positional `Vec` is unbounded and ends only at `::` or the end of the
+  invocation, so it must be the last positional argument.
 - Release documents use unindented ATX headings and fenced code blocks. This is
   a deliberate narrow document format, not a complete CommonMark parser.
 - The release updater replaces the document through a temporary file in the same

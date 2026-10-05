@@ -227,7 +227,9 @@ validates their metadata, and detects collisions across linked crates.
 
 - Use typed parameters. Required scalars are positional by default; defaults,
   `Option`, and `Vec` produce named options. Use `#[bake(named)]` for a required
-  named option and document the purpose of arguments with `help`.
+  named option. A `Vec` can opt into positional variadic arguments with
+  `#[bake(positional)]`; it must be the last positional parameter, and callers
+  must use `::` before a following task. Document arguments with `help`.
 - Resolve project-relative paths against `context.root()`. Use
   `context.command(...)` for project subprocesses, or pass an explicit working
   directory to an operation acting on another checkout. Avoid changing the

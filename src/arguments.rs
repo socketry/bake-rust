@@ -49,6 +49,13 @@ impl Parameter {
         self.required = false;
         self
     }
+    /// Consume repeated bare values until the task chain separator.
+    pub fn variadic(mut self) -> Self {
+        self.repeated = true;
+        self.positional = true;
+        self.required = false;
+        self
+    }
     pub fn default(mut self, value: impl Into<String>) -> Self {
         self.default = Some(value.into());
         self.required = false;
@@ -163,7 +170,8 @@ impl Arguments {
                 consumed += 1;
                 arguments.insert(parameter, value)?;
             } else if let Some(parameter) = parameters.iter().find(|parameter| {
-                parameter.positional && !arguments.0.contains_key(&parameter.name)
+                parameter.positional
+                    && (parameter.repeated || !arguments.0.contains_key(&parameter.name))
             }) {
                 arguments.insert(parameter, token)?;
                 consumed += 1;

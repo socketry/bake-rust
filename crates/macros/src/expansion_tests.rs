@@ -30,6 +30,12 @@ fn rejects_unsupported_signatures() {
         "fn example(#[bake(input)] value: String) {}",
         "fn example(#[bake(input)] first: Value, #[bake(input)] second: Value) {}",
         "fn example(#[bake(input, named)] value: Value) {}",
+        "fn example(#[bake(positional)] value: String) {}",
+        "fn example(#[bake(named, positional)] values: Vec<String>) {}",
+        "fn example(#[bake(positional)] values: Vec<String>, name: String) {}",
+        "fn example(#[bake(positional)] first: Vec<String>, #[bake(positional)] second: Vec<String>) {}",
+        "fn example(#[bake(input, positional)] value: Value) {}",
+        "fn example(#[bake(context, positional)] context: &mut Context) {}",
     ] {
         assert!(
             expand(quote!(), syn::parse_str(source).unwrap()).is_err(),
@@ -198,6 +204,24 @@ fn expands_optional_repeated_context_and_named_parameters() {
     assert!(output.contains("help (\"A numeric default.\")"));
     assert!(output.contains("builtin : true"));
     assert!(output.contains("Describe the generated task."));
+}
+
+#[test]
+fn expands_positional_variadic_arguments() {
+    let output = expand(
+        quote!(),
+        syn::parse_quote! {
+            fn example(#[bake(positional, help = "Input files.")] paths: Vec<String>) -> Result<Vec<String>> {
+                Ok(paths)
+            }
+        },
+    )
+    .unwrap()
+    .to_string();
+
+    assert!(output.contains("variadic ()"));
+    assert!(output.contains("repeated :: < String >"));
+    assert!(output.contains("Input files."));
 }
 
 #[test]

@@ -1,5 +1,10 @@
 # Releases
 
+## Unreleased
+
+- Support unbounded positional `Vec<T>` task arguments with
+  `#[bake(positional)]`. Require `::` before chaining another task.
+
 ## v0.18.0
 
 - Derive default task namespaces from `bake_*` library crate names, stripping
