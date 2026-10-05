@@ -7,9 +7,7 @@ mod project;
 use options::Options;
 use project::Project;
 use std::ffi::OsString;
-use std::process::Command;
-#[cfg(not(test))]
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 
 type Result<Output> = std::result::Result<Output, Box<dyn std::error::Error>>;
 
@@ -108,24 +106,43 @@ fn command_status(command: &mut Command) -> Result<i32> {
     Ok(status.code().unwrap_or(1))
 }
 
-#[cfg(not(test))]
-fn main() -> ExitCode {
-    match run() {
-        Ok(code) => {
-            // Preserve the full process code, including Windows child exit codes.
-            std::process::exit(code)
-        }
+fn process_result(
+    result: Result<i32>,
+    exit: impl FnOnce(i32) -> ExitCode,
+    report: impl FnOnce(String),
+) -> ExitCode {
+    match result {
+        Ok(code) => exit(code),
         Err(error) => {
-            eprintln!("cargo bake: {error}");
+            report(format!("cargo bake: {error}"));
             ExitCode::FAILURE
         }
     }
+}
+
+#[cfg(not(test))]
+fn main() -> ExitCode {
+    // Preserve the full process code, including Windows child exit codes.
+    process_result(
+        run(),
+        |code| std::process::exit(code),
+        |message| eprintln!("{message}"),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    fn assert_exit_code(code: i32) -> ExitCode {
+        assert_eq!(code, 23);
+        ExitCode::SUCCESS
+    }
+
+    fn assert_error_message(error: String) {
+        assert_eq!(error, "cargo bake: expected failure");
+    }
 
     #[test]
     fn cargo_program_uses_the_environment_or_default() {
@@ -135,6 +152,19 @@ mod tests {
             cargo().get_program(),
             cargo_program(std::env::var_os("CARGO"))
         );
+    }
+
+    #[test]
+    fn process_result_preserves_exit_codes_and_reports_errors() {
+        let result = process_result(Ok(23), assert_exit_code, assert_error_message);
+        assert_eq!(result, ExitCode::SUCCESS);
+
+        let result = process_result(
+            Err("expected failure".into()),
+            assert_exit_code,
+            assert_error_message,
+        );
+        assert_eq!(result, ExitCode::FAILURE);
     }
 
     #[test]
