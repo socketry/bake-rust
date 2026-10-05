@@ -7,6 +7,9 @@ repository.workspace = true
 description = "Cargo launcher for project-local Bake tasks"
 readme = "readme.md"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage)"] }
+
 [[bin]]
 name = "cargo-bake"
 path = "src/main.rs"

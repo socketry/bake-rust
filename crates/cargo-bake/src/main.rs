@@ -24,6 +24,24 @@ fn run() -> Result<i32> {
     run_with_arguments(std::env::args_os().skip(1), std::env::current_dir())
 }
 
+// Windows terminates directly from `std::process::exit`, before LLVM's profile
+// runtime can write the child process's coverage data.
+#[cfg(all(not(test), coverage, windows))]
+unsafe extern "C" {
+    fn __llvm_profile_write_file() -> i32;
+}
+
+#[cfg(all(not(test), coverage, windows))]
+fn write_coverage_profile() {
+    // The coverage runtime is linked by cargo-llvm-cov for coverage builds.
+    unsafe {
+        let _ = __llvm_profile_write_file();
+    }
+}
+
+#[cfg(all(not(test), not(all(coverage, windows))))]
+fn write_coverage_profile() {}
+
 fn run_with_arguments(
     arguments: impl IntoIterator<Item = OsString>,
     current_directory: std::io::Result<std::path::PathBuf>,
@@ -125,7 +143,10 @@ fn main() -> ExitCode {
     // Preserve the full process code, including Windows child exit codes.
     process_result(
         run(),
-        |code| std::process::exit(code),
+        |code| {
+            write_coverage_profile();
+            std::process::exit(code)
+        },
         |message| eprintln!("{message}"),
     )
 }
