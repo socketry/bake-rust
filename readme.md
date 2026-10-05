@@ -31,35 +31,15 @@ The earlier `socketry-bake` package remains available for existing projects; use
 
 ## Add tasks to a project
 
-Add an unpublished `bake` binary crate to your workspace:
+Create the private task package and let Cargo select the Bake dependency:
 
-```text
-Cargo.toml
-src/
-bake/
-  Cargo.toml
-  src/main.rs
+```sh
+cargo bake --regenerate
+cargo add --manifest-path bake/Cargo.toml bake
+cargo bake --regenerate
 ```
 
-In the project's `Cargo.toml`:
-
-```toml
-[workspace]
-members = ["bake"]
-```
-
-In `bake/Cargo.toml`, depend on Bake by its published crate version:
-
-```toml
-[package]
-name = "project-tasks"
-version = "0.0.0"
-edition = "2024"
-publish = false
-
-[dependencies]
-bake = "0.19"
-```
+The launcher creates an unpublished `bake/` binary and adds it to your workspace. The manifest records the dependency requirement; `Cargo.lock` records the selected version.
 
 In `bake/src/main.rs`:
 
@@ -223,6 +203,10 @@ Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or
 
 See [releases.md](releases.md) for the full release history.
 
+### v0.19.2
+
+- Give `Parameter` and `OutputFormat` dedicated source files; preserve `Format` as a compatibility alias and refresh dependency setup examples.
+
 ### v0.19.1
 
 - Keep generated dependency skills out of the tracked repository.
@@ -237,14 +221,12 @@ See [releases.md](releases.md) for the full release history.
 
 - Support unbounded positional `Vec<T>` task arguments with `#[bake(positional)]`. Require `::` before chaining another task.
 
-### v0.18.0
-
-- Derive default task namespaces from `bake_*` library crate names, stripping `bake_` and translating remaining underscores to colons. Preserve explicit names, project binary names, and matching module prefixes. Existing unnamed library tasks outside those prefixes gain a namespace; use explicit names to retain their previous commands.
-- Use `bake = "0"` for reusable task libraries so linked crates resolve one Bake 0.x version and share its task registry.
-- Resolve task names at compile time. Generated descriptors now include their full namespaces, making manual registration and automatic discovery agree. Manual registries that added those namespaces with `Registry::include` should register the descriptors directly to avoid repeating the prefix.
-- Document semantic task-library APIs, crate-derived namespaces, and testing conventions aligned with `socketry-project`.
-
 <!-- bake-readme:releases:end -->
+
+## See Also
+
+- [`socketry-project`](https://github.com/socketry/socketry-project-rust).
+- [`bake-agent-context`](https://github.com/socketry/bake-agent-context-rust).
 
 ## Contributing
 

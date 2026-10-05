@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{Arguments, Context, Error, Format, Result, Task, output};
+use crate::{Arguments, Context, Error, OutputFormat, Result, Task, output};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::io::{self, Write};
@@ -269,7 +269,7 @@ impl Registry {
 
     fn run_arguments_from(self, root: PathBuf, tokens: &[String]) -> Result<String> {
         let (format, tokens) = if tokens.first().is_some_and(|token| token == "--json") {
-            (Some(Format::Json), &tokens[1..])
+            (Some(OutputFormat::Json), &tokens[1..])
         } else {
             (None, tokens)
         };

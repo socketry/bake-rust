@@ -1,58 +1,20 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{Context, Error, Result, Value};
-use std::fmt;
+use crate::{Context, Error, OutputFormat, Result, Value};
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
 
-/// Built-in result encodings accepted by the default `output` task.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Format {
-    /// Plain text for strings and pretty JSON for structured values.
-    Raw,
-    /// Indented JSON.
-    Json,
-    /// One compact JSON value per line; the input must be an array.
-    Ndjson,
-}
-
-impl FromStr for Format {
-    type Err = Error;
-
-    fn from_str(value: &str) -> Result<Self> {
-        match value {
-            "raw" => Ok(Self::Raw),
-            "json" => Ok(Self::Json),
-            "ndjson" => Ok(Self::Ndjson),
-            _ => Err(Error::new(format!(
-                "unknown output format {value:?}; use raw, json, or ndjson"
-            ))),
-        }
-    }
-}
-
-impl fmt::Display for Format {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::Raw => "raw",
-            Self::Json => "json",
-            Self::Ndjson => "ndjson",
-        })
-    }
-}
-
-fn format_value(value: &Value, format: Format) -> Result<String> {
+fn format_value(value: &Value, format: OutputFormat) -> Result<String> {
     let mut output = match format {
-        Format::Raw => match value {
+        OutputFormat::Raw => match value {
             Value::String(text) => text.clone(),
             Value::Null => String::new(),
             value => pretty_json(value),
         },
-        Format::Json => pretty_json(value),
-        Format::Ndjson => {
+        OutputFormat::Json => pretty_json(value),
+        OutputFormat::Ndjson => {
             let Value::Array(values) = value else {
                 return Err(Error::new("ndjson output requires an array result"));
             };
@@ -81,11 +43,11 @@ fn compact_json(value: &Value) -> String {
         .unwrap_or_else(|error| unreachable!("JSON values always serialize: {error}"))
 }
 
-fn inferred_format(file: &Path) -> Option<Format> {
+fn inferred_format(file: &Path) -> Option<OutputFormat> {
     match file.extension()?.to_str()?.to_ascii_lowercase().as_str() {
-        "json" => Some(Format::Json),
-        "ndjson" => Some(Format::Ndjson),
-        "txt" | "text" => Some(Format::Raw),
+        "json" => Some(OutputFormat::Json),
+        "ndjson" => Some(OutputFormat::Ndjson),
+        "txt" | "text" => Some(OutputFormat::Raw),
         _ => None,
     }
 }
@@ -100,12 +62,12 @@ pub fn output(
     context: &mut Context,
     #[bake(input)] input: Value,
     file: Option<PathBuf>,
-    format: Option<Format>,
+    format: Option<OutputFormat>,
 ) -> Result<Value> {
     let format = format
         .or_else(|| context.default_format())
         .or_else(|| file.as_deref().and_then(inferred_format))
-        .unwrap_or(Format::Raw);
+        .unwrap_or(OutputFormat::Raw);
     let contents = format_value(&input, format)?;
 
     if let Some(file) = file {
@@ -135,24 +97,33 @@ mod tests {
 
     #[test]
     fn formats_have_stable_names() {
-        assert_eq!(Format::Raw.to_string(), "raw");
-        assert_eq!(Format::Json.to_string(), "json");
-        assert_eq!(Format::Ndjson.to_string(), "ndjson");
-        assert_eq!("raw".parse::<Format>().unwrap(), Format::Raw);
-        assert_eq!("json".parse::<Format>().unwrap(), Format::Json);
-        assert_eq!("ndjson".parse::<Format>().unwrap(), Format::Ndjson);
-        assert!("yaml".parse::<Format>().is_err());
+        assert_eq!(OutputFormat::Raw.to_string(), "raw");
+        assert_eq!(OutputFormat::Json.to_string(), "json");
+        assert_eq!(OutputFormat::Ndjson.to_string(), "ndjson");
+        assert_eq!("raw".parse::<OutputFormat>().unwrap(), OutputFormat::Raw);
+        assert_eq!("json".parse::<OutputFormat>().unwrap(), OutputFormat::Json);
+        assert_eq!(
+            "ndjson".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Ndjson
+        );
+        assert!("yaml".parse::<OutputFormat>().is_err());
     }
 
     #[test]
     fn unknown_file_extensions_do_not_select_a_format() {
         assert_eq!(inferred_format(Path::new("releases.md")), None);
         assert_eq!(inferred_format(Path::new("notes.csv")), None);
-        assert_eq!(inferred_format(Path::new("notes.txt")), Some(Format::Raw));
-        assert_eq!(inferred_format(Path::new("notes.text")), Some(Format::Raw));
+        assert_eq!(
+            inferred_format(Path::new("notes.txt")),
+            Some(OutputFormat::Raw)
+        );
+        assert_eq!(
+            inferred_format(Path::new("notes.text")),
+            Some(OutputFormat::Raw)
+        );
         assert_eq!(
             inferred_format(Path::new("notes.ndjson")),
-            Some(Format::Ndjson)
+            Some(OutputFormat::Ndjson)
         );
     }
 

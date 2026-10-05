@@ -157,11 +157,11 @@ Use ordinary Rust calls to compose implementation operations. Use `context.call(
 
 Add a reusable task library as a dependency of the local task binary, then run `cargo bake --regenerate` so its registration entries are linked:
 
-```toml
-[dependencies]
-bake = "0.19"
-socketry_executor = { package = "socketry-executor", version = "0.1" }
-bake_agent_context = "0.3"
+```sh
+cargo bake --regenerate
+cargo add --manifest-path bake/Cargo.toml socketry-executor --rename socketry_executor
+cargo add --manifest-path bake/Cargo.toml bake-agent-context
+cargo bake --regenerate
 ```
 
 The first `cargo bake --regenerate` creates the private `bake/` workspace member and its minimal binary if they do not exist. Each run regenerates a small source file that links unconditional, non-optional, platform-independent direct dependencies in `bake/Cargo.toml` (apart from `bake` itself), and adds a module declaration to the selected binary if needed. It preserves the rest of the task source. Put reusable task libraries in `[dependencies]`; ordinary dependencies used by task code are also linked.
