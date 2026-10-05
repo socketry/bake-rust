@@ -328,6 +328,11 @@ for the standard process.
 <!-- bake-readme:releases:start -->
 See [releases.md](releases.md) for the full release history.
 
+### v0.19.0
+
+- Support unbounded positional `Vec<T>` task arguments with
+  `#[bake(positional)]`. Require `::` before chaining another task.
+
 ### v0.18.0
 
 - Derive default task namespaces from `bake_*` library crate names, stripping
@@ -348,13 +353,6 @@ See [releases.md](releases.md) for the full release history.
 
 - Use the shared `socketry-project` Releasing skill for the standard release
   process and remove references to the duplicate Bake Cargo publishing context.
-
-### v0.17.3
-
-- Align the Readme's contribution guidance with Bake Readme conventions.
-- Remove the local Bake alias and install the launcher explicitly for repository
-  tasks.
-- Require complete line coverage in CI with the standard Bake coverage task.
 <!-- bake-readme:releases:end -->
 
 ## Contributing

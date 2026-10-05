@@ -1,6 +1,6 @@
 # Releases
 
-## Unreleased
+## v0.19.0
 
 - Support unbounded positional `Vec<T>` task arguments with
   `#[bake(positional)]`. Require `::` before chaining another task.
