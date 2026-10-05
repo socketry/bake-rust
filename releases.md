@@ -1,6 +1,6 @@
 # Releases
 
-## Unreleased
+## v0.19.2
 
 - Give `Parameter` and `OutputFormat` dedicated source files; preserve `Format` as a compatibility alias and refresh dependency setup examples.
 

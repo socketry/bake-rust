@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "bake"
-version = "0.19.1"
+version = "0.19.2"
 dependencies = [
  "bake-macros",
  "linkme",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "bake-macros"
-version = "0.19.1"
+version = "0.19.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -658,7 +658,7 @@ checksum = "f9395f0f0eee849a9b707b2f06bb92a6a422090e2123bb2ef8e87a0e61892a8e"
 
 [[package]]
 name = "socketry-cargo-bake"
-version = "0.19.1"
+version = "0.19.2"
 dependencies = [
  "serde",
  "serde_json",
