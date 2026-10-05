@@ -31,35 +31,15 @@ The earlier `socketry-bake` package remains available for existing projects; use
 
 ## Add tasks to a project
 
-Add an unpublished `bake` binary crate to your workspace:
+Create the private task package and let Cargo select the Bake dependency:
 
-```text
-Cargo.toml
-src/
-bake/
-  Cargo.toml
-  src/main.rs
+```sh
+cargo bake --regenerate
+cargo add --manifest-path bake/Cargo.toml bake
+cargo bake --regenerate
 ```
 
-In the project's `Cargo.toml`:
-
-```toml
-[workspace]
-members = ["bake"]
-```
-
-In `bake/Cargo.toml`, depend on Bake by its published crate version:
-
-```toml
-[package]
-name = "project-tasks"
-version = "0.0.0"
-edition = "2024"
-publish = false
-
-[dependencies]
-bake = "0.19"
-```
+The launcher creates an unpublished `bake/` binary and adds it to your workspace. The manifest records the dependency requirement; `Cargo.lock` records the selected version.
 
 In `bake/src/main.rs`:
 
@@ -245,6 +225,11 @@ See [releases.md](releases.md) for the full release history.
 - Document semantic task-library APIs, crate-derived namespaces, and testing conventions aligned with `socketry-project`.
 
 <!-- bake-readme:releases:end -->
+
+## See Also
+
+- [`socketry-project`](https://github.com/socketry/socketry-project-rust).
+- [`bake-agent-context`](https://github.com/socketry/bake-agent-context-rust).
 
 ## Contributing
 

@@ -13,6 +13,8 @@ mod arguments;
 mod context;
 mod error;
 mod output;
+mod output_format;
+mod parameter;
 mod registry;
 mod task;
 mod task_name;
@@ -24,11 +26,14 @@ pub mod __private {
     pub use linkme;
 }
 
-pub use arguments::{Arguments, Parameter};
+pub use arguments::Arguments;
 pub use bake_macros::task;
 pub use context::Context;
 pub use error::{Error, Result};
-pub use output::Format;
+pub use output_format::OutputFormat;
+/// Compatibility name for [`OutputFormat`].
+pub use output_format::OutputFormat as Format;
+pub use parameter::Parameter;
 pub use registry::Registry;
 pub use serde_json::Value;
 pub use task::Task;

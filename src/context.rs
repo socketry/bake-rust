@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::output::Format;
+use crate::OutputFormat;
 use crate::registry::Invocation;
 use crate::{Error, Registry, Result, Value};
 use std::any::{Any, TypeId};
@@ -21,7 +21,7 @@ pub struct Context {
     state: HashMap<TypeId, Box<dyn Any>>,
     depth: usize,
     terminal_output: String,
-    default_format: Option<Format>,
+    default_format: Option<OutputFormat>,
 }
 
 impl Context {
@@ -49,10 +49,10 @@ impl Context {
     pub(crate) fn take_output(&mut self) -> String {
         std::mem::take(&mut self.terminal_output)
     }
-    pub(crate) fn set_default_format(&mut self, format: Option<Format>) {
+    pub(crate) fn set_default_format(&mut self, format: Option<OutputFormat>) {
         self.default_format = format;
     }
-    pub(crate) fn default_format(&self) -> Option<Format> {
+    pub(crate) fn default_format(&self) -> Option<OutputFormat> {
         self.default_format
     }
     pub fn insert<State: Any>(&mut self, state: State) {
@@ -133,8 +133,8 @@ mod tests {
         let mut context = Registry::new().context("project");
         assert_eq!(context.root(), Path::new("project"));
         assert_eq!(context.previous(), &Value::Null);
-        context.set_default_format(Some(Format::Json));
-        assert_eq!(context.default_format(), Some(Format::Json));
+        context.set_default_format(Some(OutputFormat::Json));
+        assert_eq!(context.default_format(), Some(OutputFormat::Json));
         assert!(context.get::<usize>().is_none());
         assert!(context.get_mut::<usize>().is_none());
 

@@ -1,5 +1,9 @@
 # Releases
 
+## Unreleased
+
+- Give `Parameter` and `OutputFormat` dedicated source files; preserve `Format` as a compatibility alias and refresh dependency setup examples.
+
 ## v0.19.1
 
 - Keep generated dependency skills out of the tracked repository.
