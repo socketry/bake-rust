@@ -1,36 +1,34 @@
 # Releases
 
+## v0.19.1
+
+- Keep generated dependency skills out of the tracked repository.
+
+- Adopt `socketry-project` 0.3.7 for shared project tasks and Markdown normalization.
+
+- Require the aggregate test and coverage result for pull request merges.
+
+- Refresh dependency examples and repository-owned agent guidance.
+
 ## v0.19.0
 
-- Support unbounded positional `Vec<T>` task arguments with
-  `#[bake(positional)]`. Require `::` before chaining another task.
+- Support unbounded positional `Vec<T>` task arguments with `#[bake(positional)]`. Require `::` before chaining another task.
 
 ## v0.18.0
 
-- Derive default task namespaces from `bake_*` library crate names, stripping
-  `bake_` and translating remaining underscores to colons. Preserve explicit
-  names, project binary names, and matching module prefixes. Existing unnamed
-  library tasks outside those prefixes gain a namespace; use explicit names to
-  retain their previous commands.
-- Use `bake = "0"` for reusable task libraries so linked crates resolve one
-  Bake 0.x version and share its task registry.
-- Resolve task names at compile time. Generated descriptors now include their
-  full namespaces, making manual registration and automatic discovery agree.
-  Manual registries that added those namespaces with `Registry::include` should
-  register the descriptors directly to avoid repeating the prefix.
-- Document semantic task-library APIs, crate-derived namespaces, and testing
-  conventions aligned with `socketry-project`.
+- Derive default task namespaces from `bake_*` library crate names, stripping `bake_` and translating remaining underscores to colons. Preserve explicit names, project binary names, and matching module prefixes. Existing unnamed library tasks outside those prefixes gain a namespace; use explicit names to retain their previous commands.
+- Use `bake = "0"` for reusable task libraries so linked crates resolve one Bake 0.x version and share its task registry.
+- Resolve task names at compile time. Generated descriptors now include their full namespaces, making manual registration and automatic discovery agree. Manual registries that added those namespaces with `Registry::include` should register the descriptors directly to avoid repeating the prefix.
+- Document semantic task-library APIs, crate-derived namespaces, and testing conventions aligned with `socketry-project`.
 
 ## v0.17.4
 
-- Use the shared `socketry-project` Releasing skill for the standard release
-  process and remove references to the duplicate Bake Cargo publishing context.
+- Use the shared `socketry-project` Releasing skill for the standard release process and remove references to the duplicate Bake Cargo publishing context.
 
 ## v0.17.3
 
 - Align the Readme's contribution guidance with Bake Readme conventions.
-- Remove the local Bake alias and install the launcher explicitly for repository
-  tasks.
+- Remove the local Bake alias and install the launcher explicitly for repository tasks.
 - Require complete line coverage in CI with the standard Bake coverage task.
 
 ## v0.17.2
