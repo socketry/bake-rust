@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "bake"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "bake-macros",
  "linkme",
@@ -38,7 +38,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
- "socketry-markdown",
+ "socketry-markdown 0.1.0",
 ]
 
 [[package]]
@@ -52,7 +52,7 @@ dependencies = [
  "bake-releases",
  "serde",
  "serde_json",
- "socketry-markdown",
+ "socketry-markdown 0.1.0",
  "tempfile",
  "toml_edit",
  "ureq",
@@ -65,17 +65,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4877b435fe237311d88e546e8fb2b4a9021aff3550b625b8286e27da0ec693fd"
 dependencies = [
  "bake",
- "socketry-markdown",
+ "socketry-markdown 0.1.0",
  "tempfile",
 ]
 
 [[package]]
 name = "bake-macros"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "bake-markdown"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be72df839f4db26a93f2fe0659e57ce7998900b9445b04ba1367d51b4ba38587"
+dependencies = [
+ "bake",
+ "socketry-markdown 0.3.0",
 ]
 
 [[package]]
@@ -86,7 +96,7 @@ checksum = "24fe3770977781484405d216b11a614a3e26404bb932bdddde718fad206f35c0"
 dependencies = [
  "bake",
  "serde_json",
- "socketry-markdown",
+ "socketry-markdown 0.1.0",
  "tempfile",
 ]
 
@@ -97,7 +107,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8439a25fe3a3192a666570d3d907cfb5bff8fdb5df17c92e495bcd4132ce0283"
 dependencies = [
  "bake",
- "socketry-markdown",
+ "socketry-markdown 0.1.0",
  "tempfile",
 ]
 
@@ -648,7 +658,7 @@ checksum = "f9395f0f0eee849a9b707b2f06bb92a6a422090e2123bb2ef8e87a0e61892a8e"
 
 [[package]]
 name = "socketry-cargo-bake"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -667,15 +677,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "socketry-project"
-version = "0.3.3"
+name = "socketry-markdown"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5c5a54ff8afc1eb90dfff374dad7550205d28956993b32c1bb7ae49776e1d3c"
+checksum = "8c02f802fe678b660dd21a6b6130bc2d0eb3423c24b9f26ebddb46514769e788"
+dependencies = [
+ "regex",
+ "unicode-id",
+]
+
+[[package]]
+name = "socketry-project"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2d4af345d5695d21119455e14c348b42267bc0c18eea584b44599d24f42d33e"
 dependencies = [
  "bake",
  "bake-agent-context",
  "bake-cargo",
  "bake-license",
+ "bake-markdown",
  "bake-readme",
  "bake-releases",
  "bake-test-rust",
