@@ -184,7 +184,11 @@ impl Registry {
                     "named"
                 };
                 let display_name = if parameter.positional {
-                    parameter.name.clone()
+                    if parameter.repeated {
+                        format!("{}...", parameter.name)
+                    } else {
+                        parameter.name.clone()
+                    }
                 } else {
                     format!("--{} value", parameter.name.replace('_', "-"))
                 };
@@ -311,6 +315,7 @@ fn validate_task(task: &Task) -> Result<()> {
         return Err(Error::new(format!("invalid task name {:?}", task.name)));
     }
     let mut parameters = BTreeSet::new();
+    let mut positional_variadic_seen = false;
     for parameter in &task.parameters {
         if parameter.name.is_empty()
             || !parameter
@@ -328,6 +333,14 @@ fn validate_task(task: &Task) -> Result<()> {
                 "duplicate parameter {:?}",
                 parameter.name
             )));
+        }
+        if positional_variadic_seen && parameter.positional {
+            return Err(Error::new(
+                "a positional variadic parameter must be the last positional argument",
+            ));
+        }
+        if parameter.positional && parameter.repeated {
+            positional_variadic_seen = true;
         }
     }
     Ok(())
@@ -437,6 +450,19 @@ mod tests {
 
         registry.register(task("duplicate", vec![])).unwrap();
         assert!(registry.register(task("duplicate", vec![])).is_err());
+    }
+
+    #[test]
+    fn positional_variadic_must_be_the_last_positional_parameter() {
+        let task = task(
+            "invalid_positional_variadic",
+            vec![
+                crate::Parameter::new::<String>("paths").variadic(),
+                crate::Parameter::new::<String>("path"),
+            ],
+        );
+
+        assert!(validate_task(&task).is_err());
     }
 
     #[test]

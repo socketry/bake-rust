@@ -24,6 +24,14 @@ fn options(
 }
 
 #[bake::task]
+fn collect_files(
+    #[bake(positional, help = "Files to collect.")] files: Vec<String>,
+    #[bake(default = false)] recursive: bool,
+) -> Result<Value> {
+    bake::value((files, recursive))
+}
+
+#[bake::task]
 fn add(left: i64, right: i64) -> Result<i64> {
     Ok(left + right)
 }
@@ -107,6 +115,7 @@ fn registry() -> Registry {
     for task in [
         greet_task(),
         options_task(),
+        collect_files_task(),
         add_task(),
         previous_task(),
         remember_task(),
@@ -184,6 +193,52 @@ fn optional_and_repeated_values_and_hyphenated_names() {
         serde_json::from_str::<Value>(&output).unwrap(),
         serde_json::json!(["some file", ["one", "two"], "changes.md"])
     );
+}
+
+#[test]
+fn positional_variadic_arguments_consume_values_until_the_chain_separator() {
+    assert_eq!(
+        serde_json::from_str::<Value>(&run(&["collect_files"]).unwrap()).unwrap(),
+        serde_json::json!([[], false])
+    );
+
+    assert_eq!(
+        serde_json::from_str::<Value>(&run(&["collect_files", "one.md", "two.md"]).unwrap())
+            .unwrap(),
+        serde_json::json!([["one.md", "two.md"], false])
+    );
+
+    assert_eq!(
+        serde_json::from_str::<Value>(
+            &run(&["collect_files", "one.md", "two.md", "::", "previous",]).unwrap()
+        )
+        .unwrap(),
+        serde_json::json!([["one.md", "two.md"], false])
+    );
+
+    assert_eq!(
+        serde_json::from_str::<Value>(&run(&["collect_files", "one.md", "previous"]).unwrap())
+            .unwrap(),
+        serde_json::json!([["one.md", "previous"], false])
+    );
+
+    assert_eq!(
+        serde_json::from_str::<Value>(
+            &run(&["collect_files", "one.md", "two.md", "--recursive", "true",]).unwrap()
+        )
+        .unwrap(),
+        serde_json::json!([["one.md", "two.md"], true])
+    );
+
+    assert_eq!(
+        serde_json::from_str::<Value>(&run(&["collect_files", "--", "--input.md"]).unwrap())
+            .unwrap(),
+        serde_json::json!([["--input.md"], false])
+    );
+
+    let help = registry().help(Some("collect_files")).unwrap();
+    assert!(help.contains("files..."));
+    assert!(help.contains("Files to collect."));
 }
 
 #[test]
@@ -471,6 +526,20 @@ fn descriptor_validation() {
                     Parameter::new::<String>("same")
                 ],
                 handler
+            ))
+            .is_err()
+    );
+
+    assert!(
+        Registry::new()
+            .register(Task::new(
+                "invalid_positional_variadic",
+                "",
+                vec![
+                    Parameter::new::<String>("paths").variadic(),
+                    Parameter::new::<String>("path"),
+                ],
+                handler,
             ))
             .is_err()
     );

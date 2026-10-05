@@ -16,9 +16,11 @@ existing custom commands and metadata; a native Cargo tasks table is unnecessary
 
 The task attribute generates a descriptor and argument adapter next to the original
 function. The function remains directly callable. Required scalars are positional;
-defaults, Option, and Vec make named arguments. Function documentation becomes
-task help. The macro checks unsupported signatures and lets Rust check argument
-traits, output serialization, and the original function body.
+defaults, Option, and Vec make named arguments. A Vec can opt into unbounded
+positional arguments with `#[bake(positional)]`; it consumes bare values until
+`::` or the end of the task invocation. Function documentation becomes task help.
+The macro checks unsupported signatures and lets Rust check argument traits,
+output serialization, and the original function body.
 
 Each task macro adds a descriptor to a linkme distributed slice. The executable
 uses `Registry::discover()` to collect tasks from itself and linked dependencies.

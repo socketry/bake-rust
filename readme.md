@@ -107,6 +107,7 @@ final names whether registered manually or collected by `Registry::discover()`.
 | `#[bake(default = "releases.md")] path: PathBuf` | String literal converted to the parameter type |
 | `output: Option<PathBuf>` | Optional named argument, defaults to `None` |
 | `labels: Vec<String>` | Repeatable named argument, defaults to an empty vector |
+| `#[bake(positional)] paths: Vec<PathBuf>` | Variadic positional arguments, consumed through `::` or the end of the command |
 | `#[bake(default = false)] verbose: bool` | `--verbose true` or `--verbose false` |
 | `context: &mut Context` | Injected execution context, omitted from command-line arguments |
 | `#[bake(input)] input: Value` | Injected result from the preceding task in a chain |
@@ -122,6 +123,15 @@ repeatable arguments. Equals signs are not a named-argument separator; flag name
 accept hyphens in place of underscores. Use `--` before positional values that
 look like options. `::` is reserved as a task separator. UTF-8 task arguments are
 required.
+
+By default, `Vec<T>` parameters are repeatable named options. Add
+`#[bake(positional)]` to make a `Vec<T>` consume bare positional values instead.
+It must be the last positional parameter in its task. Since it cannot infer
+where a following task starts, use `::` before another task:
+
+```sh
+cargo bake files:normalize path/one.md path/two.md :: output
+```
 
 Task functions return `Result<Output, Error>` where `Output` implements
 `serde::Serialize` and the error implements `Display`. `bake::Result` is a
@@ -149,7 +159,9 @@ with `registry.replace("output", custom_output_task())`.
 ## Composition and hooks
 
 Chain tasks with `::`. Bare task names also start a new task once the preceding
-task's positional arguments are filled. Explicit separators make intent clearer:
+task's positional arguments are filled. An unbounded positional `Vec<T>` consumes
+all bare arguments through the end of its invocation, so an explicit `::` is
+required before another task. Explicit separators make intent clearer:
 
 ```sh
 cargo bake add 20 22 :: result
