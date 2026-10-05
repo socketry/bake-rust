@@ -7,11 +7,11 @@ publish = false
 [dependencies]
 socketry-project = "0.3"
 bake = { version = "0.18.0", path = ".." }
-bake-agent-context = { version = "0.2" }
-bake-test-rust = { version = "0.2" }
-bake-releases = { version = "0.2.1" }
-bake-cargo = { version = "0.2.9" }
-bake-license = { version = "0.1.1" }
+bake-agent-context = { version = "0.3.0" }
+bake-test-rust = { version = "0.2.2" }
+bake-releases = { version = "0.3.0" }
+bake-cargo = { version = "0.4.0" }
+bake-license = { version = "0.2.0" }
 
 [dev-dependencies]
 tempfile.workspace = true
