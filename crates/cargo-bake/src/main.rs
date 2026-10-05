@@ -7,7 +7,9 @@ mod project;
 use options::Options;
 use project::Project;
 use std::ffi::OsString;
-use std::process::{Command, ExitCode};
+use std::process::Command;
+#[cfg(not(test))]
+use std::process::ExitCode;
 
 type Result<Output> = std::result::Result<Output, Box<dyn std::error::Error>>;
 
@@ -19,6 +21,7 @@ fn cargo_program(program: Option<OsString>) -> OsString {
     program.unwrap_or_else(|| "cargo".into())
 }
 
+#[cfg(not(test))]
 fn run() -> Result<i32> {
     run_with_arguments(std::env::args_os().skip(1), std::env::current_dir())
 }
@@ -105,6 +108,7 @@ fn command_status(command: &mut Command) -> Result<i32> {
     Ok(status.code().unwrap_or(1))
 }
 
+#[cfg(not(test))]
 fn main() -> ExitCode {
     match run() {
         Ok(code) => {
@@ -258,6 +262,20 @@ mod tests {
             })
             .unwrap();
         assert_eq!(status, 23);
+
+        assert_eq!(
+            run_project_with_command(
+                Options::default(),
+                Ok(root.to_path_buf()),
+                &mut Command::new("fake-cargo"),
+                |command| {
+                    assert!(!command.get_args().any(|argument| argument == "--release"));
+                    Ok(17)
+                },
+            )
+            .unwrap(),
+            17
+        );
 
         assert_eq!(
             run_project_with_command(
